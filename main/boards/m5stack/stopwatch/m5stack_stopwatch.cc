@@ -159,6 +159,11 @@ private:
         ioe_.setDriveMode(IOE_PIN_LCD_RST, M5IOE1_DRIVE_PUSHPULL);
         ioe_.digitalWrite(IOE_PIN_LCD_RST, HIGH);
 
+        // Release the CST820B touch controller from reset (M5IOE1 G4).
+        ioe_.pinMode(IOE_PIN_TOUCH_RST, OUTPUT);
+        ioe_.setDriveMode(IOE_PIN_TOUCH_RST, M5IOE1_DRIVE_PUSHPULL);
+        ioe_.digitalWrite(IOE_PIN_TOUCH_RST, HIGH);
+
         ioe_.pinMode(IOE_PIN_CODEC_POWER, OUTPUT);
         ioe_.setDriveMode(IOE_PIN_CODEC_POWER, M5IOE1_DRIVE_PUSHPULL);
         ioe_.digitalWrite(IOE_PIN_CODEC_POWER, HIGH);
