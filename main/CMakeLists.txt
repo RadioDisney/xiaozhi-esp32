@@ -1193,6 +1193,11 @@ idf_component_register(SRCS ${SOURCES}
 # dialect; pin the baseline so main/ does not depend on it.
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)
     target_compile_options(${COMPONENT_LIB} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++23>)
+    if(CONFIG_BOARD_TYPE_M5STACK_STOPWATCH)
+        target_add_binary_data(${COMPONENT_LIB}
+            "boards/m5stack/stopwatch/assets/stopwatch_background.jpg" BINARY
+            RENAME_TO stopwatch_background_jpg)
+    endif()
 endif()
 
 # Use target_compile_definitions to define the reported board identity

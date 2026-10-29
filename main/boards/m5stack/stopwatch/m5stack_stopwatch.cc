@@ -1,21 +1,27 @@
-#include "wifi_board.h"
-#include "backlight.h"
-#include "display/lcd_display.h"
-#include "esp_lcd_co5300.h"
-#include "codecs/es8311_audio_codec.h"
-#include "application.h"
-#include "button.h"
-#include "M5IOE1.h"
-#include "M5PM1.h"
-#include "config.h"
-#include "assets/lang_config.h"
-#include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <driver/spi_master.h>
+#include <esp_heap_caps.h>
+#include <esp_log.h>
 #include <wifi_manager.h>
+#include "M5IOE1.h"
+#include "M5PM1.h"
+#include "application.h"
+#include "assets/lang_config.h"
+#include "backlight.h"
+#include "button.h"
+#include "codecs/es8311_audio_codec.h"
+#include "config.h"
+#include "display/lcd_display.h"
+#include "esp_lcd_co5300.h"
+#include "jpg/jpeg_to_image.h"
+#include "lvgl_theme.h"
+#include "wifi_board.h"
 
 #define TAG "M5StackStopwatch"
 #define LCD_OPCODE_WRITE_CMD (0x02ULL)
+
+extern const uint8_t stopwatch_background_jpg_start[] asm("_binary_stopwatch_background_jpg_start");
+extern const uint8_t stopwatch_background_jpg_end[] asm("_binary_stopwatch_background_jpg_end");
 
 // CO5300 AMOLED: initialize at full brightness, then restore the saved setting.
 static const co5300_lcd_init_cmd_t vendor_specific_init[] = {
@@ -34,6 +40,38 @@ static const co5300_lcd_init_cmd_t vendor_specific_init[] = {
 };
 
 class RoundLcdDisplay : public SpiLcdDisplay {
+private:
+    std::shared_ptr<LvglAllocatedImage> background_image_;
+
+    void InitializeBackground() {
+        if (background_image_ != nullptr) {
+            return;
+        }
+
+        uint8_t* pixels = nullptr;
+        size_t length = 0;
+        size_t width = 0;
+        size_t height = 0;
+        size_t stride = 0;
+        const size_t jpeg_size = stopwatch_background_jpg_end - stopwatch_background_jpg_start;
+        esp_err_t err = jpeg_to_image(stopwatch_background_jpg_start, jpeg_size, &pixels, &length,
+                                      &width, &height, &stride);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to decode background: %s", esp_err_to_name(err));
+            return;
+        }
+        if (width != DISPLAY_WIDTH || height != DISPLAY_HEIGHT || stride != width * 2 ||
+            length != stride * height) {
+            ESP_LOGE(TAG, "Unexpected background dimensions: %zu x %zu, stride %zu", width, height,
+                     stride);
+            heap_caps_free(pixels);
+            return;
+        }
+
+        background_image_ = std::make_shared<LvglAllocatedImage>(pixels, length, width, height,
+                                                                 stride, LV_COLOR_FORMAT_RGB565);
+    }
+
 public:
     static void rounder_event_cb(lv_event_t* e) {
         lv_area_t* area = static_cast<lv_area_t*>(lv_event_get_param(e));
@@ -56,6 +94,8 @@ public:
 
     void SetupUI() override {
         SpiLcdDisplay::SetupUI();
+        InitializeBackground();
+        SetTheme(current_theme_);
         DisplayLockGuard lock(this);
 
         // Horizontal inset so labels stay inside the round mask
@@ -91,6 +131,28 @@ public:
         }
 
         lv_display_add_event_cb(display_, rounder_event_cb, LV_EVENT_INVALIDATE_AREA, NULL);
+    }
+
+    void SetTheme(Theme* theme) override {
+        if (theme == nullptr) {
+            return;
+        }
+        DisplayLockGuard lock(this);
+        if (background_image_ != nullptr) {
+            auto* lvgl_theme = static_cast<LvglTheme*>(theme);
+            lvgl_theme->set_background_image(background_image_);
+            lvgl_theme->set_text_color(lv_color_hex(0x123A52));
+        }
+        SpiLcdDisplay::SetTheme(theme);
+        if (background_image_ != nullptr) {
+            // Keep the same background visible when fonts or themes are refreshed.
+            if (top_bar_ != nullptr) {
+                lv_obj_set_style_bg_opa(top_bar_, LV_OPA_TRANSP, 0);
+            }
+            if (bottom_bar_ != nullptr) {
+                lv_obj_set_style_bg_opa(bottom_bar_, LV_OPA_TRANSP, 0);
+            }
+        }
     }
 };
 
