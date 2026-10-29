@@ -62,25 +62,32 @@ public:
         lv_obj_set_style_pad_left(status_bar_, LV_HOR_RES * 0.2, 0);
         lv_obj_set_style_pad_right(status_bar_, LV_HOR_RES * 0.2, 0);
 
-        // Status bar: upper half, below top icon bar (not at screen bottom)
+        // Keep text in the transparent upper margin of the 466x466 artwork.
         lv_obj_align(status_bar_, LV_ALIGN_TOP_MID, 0, DISPLAY_STATUS_BAR_TOP_OFF);
-        lv_obj_set_width(status_label_, LV_HOR_RES * 0.6);
-        lv_obj_set_width(notification_label_, LV_HOR_RES * 0.6);
+        lv_obj_set_width(status_label_, DISPLAY_STATUS_TEXT_WIDTH);
+        lv_obj_set_width(notification_label_, DISPLAY_STATUS_TEXT_WIDTH);
+        lv_label_set_long_mode(notification_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
         lv_obj_align(status_label_, LV_ALIGN_CENTER, 0, 0);
         lv_obj_align(notification_label_, LV_ALIGN_CENTER, 0, 0);
 
-        // Chat/subtitle text: a bit higher, away from bottom arc
+        // The portrait ends above this single-line subtitle strip.
         if (bottom_bar_ != nullptr) {
             lv_obj_align(bottom_bar_, LV_ALIGN_BOTTOM_MID, 0, -DISPLAY_CHAT_BAR_BOTTOM_OFF);
-            lv_obj_set_width(chat_message_label_, LV_HOR_RES * 0.75);
+            lv_obj_set_width(chat_message_label_, DISPLAY_CHAT_TEXT_WIDTH);
         }
 
         // emoji_box_: keep default LV_ALIGN_CENTER from SpiLcdDisplay::SetupUI()
 
-        // Top icons: move the top bar down inside the round display safe area
+        // Icons sit beside the status text and above the visible ears.
         if (top_bar_ != nullptr) {
-            lv_obj_align(top_bar_, LV_ALIGN_TOP_MID, 0, DISPLAY_ROUND_EDGE_INSET / 2);
-            lv_obj_set_style_pad_top(top_bar_, DISPLAY_ROUND_EDGE_INSET / 4, 0);
+            lv_obj_set_width(top_bar_, DISPLAY_TOP_BAR_WIDTH);
+            lv_obj_align(top_bar_, LV_ALIGN_TOP_MID, 0, DISPLAY_TOP_BAR_TOP_OFF);
+            lv_obj_set_style_pad_top(top_bar_, 0, 0);
+            lv_obj_set_style_bg_opa(top_bar_, LV_OPA_TRANSP, 0);
+            auto* right_icons = lv_obj_get_child(top_bar_, 1);
+            if (right_icons != nullptr) {
+                lv_obj_set_style_pad_column(right_icons, 0, 0);
+            }
         }
 
         lv_display_add_event_cb(display_, rounder_event_cb, LV_EVENT_INVALIDATE_AREA, NULL);
