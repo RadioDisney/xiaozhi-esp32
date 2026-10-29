@@ -101,6 +101,19 @@ releases/v<project-version>_m5stack-stopwatch.zip
 
 构建脚本会更新本地 sdkconfig 和 build 状态，切换其他板卡后需重新运行上述命令。
 
+## Firecat 动态表情
+
+本板卡默认使用 `emoji/` 中的 21 个 Firecat 透明 GIF，替代原来的 Noto 静态表情。
+每个动画为 224×224 像素、24 帧、每帧 100 ms（10 FPS），2.4 秒无限循环。
+GIF 总大小为 4,992,756 字节；资源分区还包含字体和唤醒词模型，构建时会检查
+总大小是否超过 8 MiB。
+
+文件名需保持小智情绪标识，例如 `neutral.gif`、`happy.gif`、`thinking.gif`。
+原始美术文件名中的 `01_` 等序号已在导入时去掉，动画内容保持原样。
+以后可直接替换本板卡 `emoji/` 中的文件，再运行上述构建命令；修改 GIF 会自动
+重新生成资源包，无需编辑 `managed_components/`。烧录时需包含资源分区，
+使用合并固件即可；只烧录 `xiaozhi.bin` 不会更新表情。
+
 -----------
 ## 手动配置
 
