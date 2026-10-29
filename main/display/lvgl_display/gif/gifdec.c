@@ -722,30 +722,35 @@ dispose(gd_GIF * gif)
 }
 
 /* Return 1 if got a frame; 0 if got GIF trailer; -1 if error. */
-int
-gd_get_frame(gd_GIF * gif)
-{
+int gd_get_frame(gd_GIF* gif) {
     char sep;
+    gd_GCE previous_gce = gif->gce;
 
-    dispose(gif);
     f_gif_read(gif, &sep, 1);
-    while(sep != ',') {
-        if(sep == ';') {
+    while (sep != ',') {
+        if (sep == ';') {
             f_gif_seek(gif, gif->anim_start, LV_FS_SEEK_SET);
-            if(gif->loop_count == 1 || gif->loop_count < 0) {
+            if (gif->loop_count == 1 || gif->loop_count < 0) {
                 return 0;
-            }
-            else if(gif->loop_count > 1) {
+            } else if (gif->loop_count > 1) {
                 gif->loop_count--;
             }
-        }
-        else if(sep == '!')
+        } else if (sep == '!') {
             read_ext(gif);
-        else return -1;
+        } else {
+            return -1;
+        }
         f_gif_read(gif, &sep, 1);
     }
-    if(read_image(gif) == -1)
+    /* Keep the final canvas visible when there is no next frame. Extensions
+     * above may have changed the GCE, but disposal belongs to the old frame. */
+    gd_GCE next_gce = gif->gce;
+    gif->gce = previous_gce;
+    dispose(gif);
+    gif->gce = next_gce;
+    if (read_image(gif) == -1) {
         return -1;
+    }
     return 1;
 }
 

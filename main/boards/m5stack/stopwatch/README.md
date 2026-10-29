@@ -103,11 +103,12 @@ releases/v<project-version>_m5stack-stopwatch.zip
 
 ## Firecat 表情
 
-本板卡默认使用 `emoji/` 中的 21 个 466×466 透明 Firecat 表情，包含 6 个 GIF
-和 15 个 PNG。GIF 包括 `neutral`、`happy`、`sad`、`loving`、`surprised`、
+本板卡默认使用 `emoji/` 中的 21 个 466×466 透明 Firecat GIF，包含 6 个动画
+和 15 个单帧静态图。动画包括 `neutral`、`happy`、`sad`、`loving`、`surprised`、
 `thinking`，均为每帧 100 ms（10 FPS）、无限循环，分别有 16、20 或 24 帧。
-其余情绪使用静态 PNG，减少 Flash 和动画解码开销。资源分区还包含字体和
-唤醒词模型，构建时会检查总大小是否超过 8 MiB。
+其余情绪使用单帧 GIF，播放结束后保留画面，不持续刷新。素材总大小为
+5,101,525 字节；资源分区还包含字体和唤醒词模型，构建时会检查总大小是否超过
+8 MiB。本板卡关闭 LodePNG 和 libpng 解码器；以后若使用 PNG 图片需重新启用。
 
 图片按原始 466×466 尺寸居中显示，角色可见部分约 400 像素宽。
 状态文字放在顶部透明留白，Wi-Fi/电池图标位于角色耳朵上方，底部保留单行
@@ -115,11 +116,11 @@ releases/v<project-version>_m5stack-stopwatch.zip
 本板卡将 LVGL 基础内存池设为 2 MiB，以容纳超过 1 MiB 的单个 GIF 解码缓冲；
 现有显示初始化还会在 8 MiB PSRAM 上追加 2.5 MiB 池空间。
 
-21 个表情均来自提供的美术素材（包括后来补齐的 `confused.png`），图片内容保持原样。
+21 个表情均来自提供的美术素材，图片内容保持原样。
 
-文件名需保持小智情绪标识，例如 `neutral.gif`、`happy.gif`、`angry.png`。
+文件名需保持小智情绪标识，例如 `neutral.gif`、`happy.gif`、`angry.gif`。
 原始美术文件名中的 `01_` 等序号已在导入时去掉。
-同一情绪只保留一个文件，切换 GIF/PNG 时应删除旧格式的文件。
+同一情绪只保留一个 GIF 文件。
 以后可直接替换本板卡 `emoji/` 中的文件，再运行上述构建命令；修改图片会自动
 重新生成资源包，无需编辑 `managed_components/`。烧录时需包含资源分区，
 使用合并固件即可；只烧录 `xiaozhi.bin` 不会更新表情。
