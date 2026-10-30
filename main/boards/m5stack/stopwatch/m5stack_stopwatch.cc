@@ -2,7 +2,9 @@
 #include <driver/spi_master.h>
 #include <esp_heap_caps.h>
 #include <esp_log.h>
+#include <material_symbols.h>
 #include <wifi_manager.h>
+#include <cstring>
 #include "M5IOE1.h"
 #include "M5PM1.h"
 #include "application.h"
@@ -42,6 +44,7 @@ static const co5300_lcd_init_cmd_t vendor_specific_init[] = {
 class RoundLcdDisplay : public SpiLcdDisplay {
 private:
     std::shared_ptr<LvglAllocatedImage> background_image_;
+    lv_obj_t* charging_bolt_ = nullptr;
 
     void InitializeBackground() {
         if (background_image_ != nullptr) {
@@ -130,7 +133,41 @@ public:
             }
         }
 
+        if (battery_label_ != nullptr && charging_bolt_ == nullptr) {
+            // Center the bolt inside the body of the existing 30px battery glyph.
+            static const lv_point_precise_t points[] = {{15, 11}, {11, 15}, {15, 15}, {12, 18}};
+            charging_bolt_ = lv_line_create(battery_label_);
+            lv_line_set_points(charging_bolt_, points, 4);
+            lv_obj_set_pos(charging_bolt_, 0, 0);
+            lv_obj_set_style_line_width(charging_bolt_, 2, 0);
+            lv_obj_set_style_line_rounded(charging_bolt_, true, 0);
+            lv_obj_set_style_line_color(
+                charging_bolt_, lv_obj_get_style_text_color(battery_label_, LV_PART_MAIN), 0);
+            lv_obj_add_flag(charging_bolt_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_add_flag(charging_bolt_, LV_OBJ_FLAG_IGNORE_LAYOUT);
+        }
+
         lv_display_add_event_cb(display_, rounder_event_cb, LV_EVENT_INVALIDATE_AREA, NULL);
+    }
+
+    void UpdateStatusBar(bool update_all) override {
+        SpiLcdDisplay::UpdateStatusBar(update_all);
+        DisplayLockGuard lock(this);
+        if (battery_label_ == nullptr || charging_bolt_ == nullptr) {
+            return;
+        }
+        const bool charging =
+            battery_icon_ != nullptr &&
+            std::strcmp(battery_icon_, MATERIAL_SYMBOLS_BATTERY_ANDROID_FRAME_BOLT) == 0;
+        if (charging) {
+            if (std::strcmp(lv_label_get_text(battery_label_),
+                            MATERIAL_SYMBOLS_BATTERY_ANDROID_0) != 0) {
+                lv_label_set_text(battery_label_, MATERIAL_SYMBOLS_BATTERY_ANDROID_0);
+            }
+            lv_obj_remove_flag(charging_bolt_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(charging_bolt_, LV_OBJ_FLAG_HIDDEN);
+        }
     }
 
     void SetTheme(Theme* theme) override {
@@ -144,6 +181,10 @@ public:
             lvgl_theme->set_text_color(lv_color_hex(0x123A52));
         }
         SpiLcdDisplay::SetTheme(theme);
+        if (charging_bolt_ != nullptr && battery_label_ != nullptr) {
+            lv_obj_set_style_line_color(
+                charging_bolt_, lv_obj_get_style_text_color(battery_label_, LV_PART_MAIN), 0);
+        }
         if (background_image_ != nullptr) {
             // Keep the same background visible when fonts or themes are refreshed.
             if (top_bar_ != nullptr) {
