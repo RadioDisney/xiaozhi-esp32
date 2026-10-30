@@ -344,6 +344,7 @@ bool Assets::LvglStrategy::Apply(Assets* assets, bool refresh_display_theme) {
             if (cJSON_IsObject(emoji)) {
                 cJSON* name = cJSON_GetObjectItem(emoji, "name");
                 cJSON* file = cJSON_GetObjectItem(emoji, "file");
+                cJSON* index = cJSON_GetObjectItem(emoji, "index");
                 cJSON* eaf = cJSON_GetObjectItem(emoji, "eaf");
                 if (cJSON_IsString(name) && cJSON_IsString(file) && (NULL == eaf)) {
                     if (!assets->GetAssetData(file->valuestring, ptr, size)) {
@@ -351,8 +352,16 @@ bool Assets::LvglStrategy::Apply(Assets* assets, bool refresh_display_theme) {
                                  file->valuestring);
                         continue;
                     }
-                    custom_emoji_collection->AddEmoji(name->valuestring,
-                                                      new LvglRawImage(ptr, size));
+                    void* index_ptr = nullptr;
+                    size_t index_size = 0;
+                    if (cJSON_IsString(index)) {
+                        if (!assets->GetAssetData(index->valuestring, index_ptr, index_size)) {
+                            ESP_LOGE(TAG, "MJPEG index %s is not found", index->valuestring);
+                            continue;
+                        }
+                    }
+                    custom_emoji_collection->AddEmoji(
+                        name->valuestring, new LvglRawImage(ptr, size, index_ptr, index_size));
                 }
             }
         }

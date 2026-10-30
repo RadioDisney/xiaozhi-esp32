@@ -284,18 +284,29 @@ def process_emoji_collection(emoji_collection_dir, assets_dir):
     # Copy each image from input directory to build/assets directory
     for root, dirs, files in os.walk(emoji_collection_dir):
         for file in files:
-            if file.lower().endswith(('.png', '.gif')):
+            if file.lower().endswith(('.png', '.gif', '.jpg', '.jpeg', '.mjpeg')):
                 # Copy file
                 src_file = os.path.join(root, file)
                 dst_file = os.path.join(assets_dir, file)
                 if copy_file(src_file, dst_file):
                     # Get filename without extension
                     filename_without_ext = os.path.splitext(file)[0]
+
+                    # Indexed JPEG/MJPEG collections keep timing and frame boundaries
+                    # separately, so JPEG entropy data never needs marker scanning.
+                    if file.lower().endswith(('.jpg', '.jpeg', '.mjpeg')):
+                        frame_index = os.path.join(root, filename_without_ext + '.idx')
+                        if not os.path.isfile(frame_index):
+                            raise ValueError(f"Missing JPEG/MJPEG frame index: {frame_index}")
+                        if not copy_file(frame_index, os.path.join(assets_dir, os.path.basename(frame_index))):
+                            raise ValueError(f"Failed to copy frame index: {frame_index}")
                     
                     # Add main emoji entry
                     emoji_list.append({
                         "name": filename_without_ext,
-                        "file": file
+                        "file": file,
+                        **({"index": filename_without_ext + ".idx"}
+                           if file.lower().endswith(('.jpg', '.jpeg', '.mjpeg')) else {})
                     })
                     
     

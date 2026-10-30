@@ -7,7 +7,11 @@
 
 #define TAG "LvglImage"
 
-LvglRawImage::LvglRawImage(void* data, size_t size) {
+LvglRawImage::LvglRawImage(void* data, size_t size, void* index, size_t index_size)
+    : raw_data_(static_cast<const uint8_t*>(data)),
+      raw_size_(size),
+      index_data_(static_cast<const uint8_t*>(index)),
+      index_size_(index_size) {
     bzero(&image_dsc_, sizeof(image_dsc_));
     image_dsc_.data_size = size;
     image_dsc_.data = static_cast<uint8_t*>(data);

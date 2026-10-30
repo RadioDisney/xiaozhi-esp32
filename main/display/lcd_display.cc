@@ -322,6 +322,8 @@ MipiLcdDisplay::MipiLcdDisplay(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel
 }
 
 LcdDisplay::~LcdDisplay() {
+    // Join the decode worker before its target widgets are deleted.
+    mjpeg_controller_.reset();
     SetPreviewImage(nullptr);
 
     // Clean up GIF controller
@@ -1094,6 +1096,9 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
         if (gif_controller_) {
             gif_controller_->Start();
         }
+        if (mjpeg_controller_) {
+            mjpeg_controller_->Resume();
+        }
         return;
     }
 
@@ -1108,6 +1113,9 @@ void LcdDisplay::SetPreviewImage(std::unique_ptr<LvglImage> image) {
     // Hide emoji_box_
     if (gif_controller_) {
         gif_controller_->Stop();
+    }
+    if (mjpeg_controller_) {
+        mjpeg_controller_->Pause();
     }
     lv_obj_add_flag(emoji_box_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(preview_image_, LV_OBJ_FLAG_HIDDEN);
@@ -1209,6 +1217,9 @@ bool LcdDisplay::SetEmotion(const char* emotion) {
             gif_controller_->Stop();
             gif_controller_.reset();
         }
+        if (mjpeg_controller_) {
+            mjpeg_controller_->Stop();
+        }
         lv_obj_set_style_text_font(emoji_label_, emotion_font, 0);
         lv_label_set_text(emoji_label_, utf8);
         lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
@@ -1225,8 +1236,27 @@ bool LcdDisplay::SetEmotion(const char* emotion) {
         gif_controller_->Stop();
         gif_controller_.reset();
     }
+    if (mjpeg_controller_) {
+        mjpeg_controller_->Stop();
+    }
     bool shown = false;
-    if (image->IsGif()) {
+    if (image->IsMjpeg()) {
+        if (emoji_box_ != nullptr) {
+            lv_obj_set_size(emoji_box_, width_, height_);
+            lv_obj_center(emoji_label_);
+        }
+        if (!mjpeg_controller_) {
+            mjpeg_controller_ = std::make_unique<MjpegPlayer>(this, emoji_image_, emoji_label_);
+        }
+        if (preview_image_ != nullptr && !lv_obj_has_flag(preview_image_, LV_OBJ_FLAG_HIDDEN)) {
+            mjpeg_controller_->Pause();
+        } else {
+            mjpeg_controller_->Resume();
+        }
+        shown = mjpeg_controller_->Start({image->RawData(), image->RawSize()},
+                                         {image->IndexData(), image->IndexSize()});
+    } else if (image->IsGif()) {
+        lv_obj_center(emoji_image_);
         // Create new GIF controller
         gif_controller_ = std::make_unique<LvglGif>(image->image_dsc());
 
@@ -1250,6 +1280,7 @@ bool LcdDisplay::SetEmotion(const char* emotion) {
             gif_controller_.reset();
         }
     } else {
+        lv_obj_center(emoji_image_);
         lv_image_set_src(emoji_image_, image->image_dsc());
         lv_obj_add_flag(emoji_label_, LV_OBJ_FLAG_HIDDEN);
         lv_obj_remove_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);
@@ -1264,6 +1295,10 @@ bool LcdDisplay::SetEmotion(const char* emotion) {
         if (gif_controller_) {
             gif_controller_->Stop();
             gif_controller_.reset();
+        }
+
+        if (mjpeg_controller_) {
+            mjpeg_controller_->Pause();
         }
 
         lv_obj_add_flag(emoji_image_, LV_OBJ_FLAG_HIDDEN);

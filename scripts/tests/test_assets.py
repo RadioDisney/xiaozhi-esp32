@@ -259,7 +259,7 @@ class AssetsTest(unittest.TestCase):
             void EmojiCollection::AddEmoji(const std::string&, LvglImage* image) { delete image; }
             const LvglImage* EmojiCollection::GetEmojiImage(const char*) { return nullptr; }
             EmojiCollection::~EmojiCollection() = default;
-            LvglRawImage::LvglRawImage(void*, size_t) {
+            LvglRawImage::LvglRawImage(void*, size_t, void*, size_t) {
                 assert(lvgl_ready); ++image_creations;
             }
             bool LvglRawImage::IsGif() const { return false; }

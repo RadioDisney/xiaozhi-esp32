@@ -1,0 +1,389 @@
+{
+  "version": 1,
+  "canvas": [
+    466,
+    466
+  ],
+  "crop": [
+    16,
+    80,
+    432,
+    304
+  ],
+  "quality": 82,
+  "subsampling": "4:4:4",
+  "background_sha256": "ef5b8cc0d70f4bc7d4fee4554be9bc6bdf83b5b3da8d2d243782dd65f567b785",
+  "clips": [
+    {
+      "name": "angry",
+      "file": "angry.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 37191,
+      "source_sha256": "0efb65bfba7f574fb3038eb094589f1f3bc0a111b68a7b4a327d808e77fa678e",
+      "sha256": "ae194bde0867106add3f1a91fb525ff0dbf3c47b6027f18557d1b2f8e61c3dc6"
+    },
+    {
+      "name": "confident",
+      "file": "confident.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 37138,
+      "source_sha256": "a92f6ca469602258b36025022d2256496067fb63c4bb902e11a2ac1958101677",
+      "sha256": "306b9cf92f9cf7c3d1cf62c651e382cbfaf7425075ab6a1e7cfcea3dafca65cf"
+    },
+    {
+      "name": "confused",
+      "file": "confused.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 36645,
+      "source_sha256": "0b82b28fe9f8a52dc18286d864b531ac6673288c107eb4f51261d85abc80f971",
+      "sha256": "3ba19f317d3a9a430659664e247aa18c86f548f17c50a31bb91c5b8ce9f9600f"
+    },
+    {
+      "name": "cool",
+      "file": "cool.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 36868,
+      "source_sha256": "25fb30e652fe4e9ef2e5480ded66450187bf8fb7841b39315d97077f23c97bb4",
+      "sha256": "8be8b184cb916d46e5c808e33aa4321eed884a7672d7b34701c8a9813f734254"
+    },
+    {
+      "name": "crying",
+      "file": "crying.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 36577,
+      "source_sha256": "d3f8d758a5a76ead0e7791b321dfa47c9c8cd8cfbf9362f0e512e14ba39cb337",
+      "sha256": "ed82ef240da300b431b4189aed106c687c58c085bc4a715b35d3b48a195fec8b"
+    },
+    {
+      "name": "delicious",
+      "file": "delicious.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 36890,
+      "source_sha256": "23b6f84de4d86247f9036b3a6c353cf410750a65133528e8a6cf1ee8cea04aa0",
+      "sha256": "a29658df8df8292e57261a34a7fd0ce0d7326451d03bbfd8f877f5b9ee822612"
+    },
+    {
+      "name": "embarrassed",
+      "file": "embarrassed.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 36290,
+      "source_sha256": "82f61a7a88cc4860e683f333513135db31bd2cb7a3c9a8f21d931eaba43d7e34",
+      "sha256": "56bb2f3ba22bf02a06e394ad87a1a8d2f6a6022cea08fc2f5e31a085b2f9d0b6"
+    },
+    {
+      "name": "funny",
+      "file": "funny.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 36694,
+      "source_sha256": "92993fc527f39f5a59742760f82eca0a303e6ae012f7ef4f7a937c620515158b",
+      "sha256": "109bcb53b2476623ace7044eea3e51d80437477b0de3898c74c0501ea1f80056"
+    },
+    {
+      "name": "happy",
+      "file": "happy.mjpeg",
+      "frames": 20,
+      "durations_ms": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "loops": 0,
+      "bytes": 750261,
+      "source_sha256": "32fc1f7cf9256cbbca9d6c4a3770ae4ef2278c049600bb2b5545ba4fcbf31bdc",
+      "sha256": "2b8c7f17d07d8eac6dc1ea78355172806f09f184202f578e0f786a7ef6f19b66"
+    },
+    {
+      "name": "kissy",
+      "file": "kissy.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 36372,
+      "source_sha256": "acf4fd3aa0ffad9ae0434f199e7f95418bbb4bf3d085be257cdd4b3f60dc4823",
+      "sha256": "f1eefecbef28ba53dd1b1e9b8219accf28d7290e0745d6eeb8dce20633783b46"
+    },
+    {
+      "name": "laughing",
+      "file": "laughing.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 36446,
+      "source_sha256": "f29b16225175457b3e2e24f2389aaf39b2009cbc5ed4fe32fcf20db8892f020d",
+      "sha256": "fa4a9b0e798fd050624c4180290a4ebc4b9a22f01fe7dfbc5aaf094793280f57"
+    },
+    {
+      "name": "loving",
+      "file": "loving.mjpeg",
+      "frames": 20,
+      "durations_ms": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "loops": 0,
+      "bytes": 754506,
+      "source_sha256": "79024692065b2114d4d3952522ec550a521a1aced19c78853de9b791d41bbab4",
+      "sha256": "2671cc54d6b2da1743af72c801be9b35cb0426fea29769a422236bd806c528ec"
+    },
+    {
+      "name": "neutral",
+      "file": "neutral.mjpeg",
+      "frames": 24,
+      "durations_ms": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "loops": 0,
+      "bytes": 905510,
+      "source_sha256": "b89b2aa1cd9cedb1fc45068ef255c559ade98dc99e1e03ec2c6b75ac9d9a7b9b",
+      "sha256": "40d42eb104ac9d7cf7408af32eddb9868ecf8bbf51c77ad8b1c7bdd8c5e66fd9"
+    },
+    {
+      "name": "relaxed",
+      "file": "relaxed.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 35850,
+      "source_sha256": "6486abe5c8f3842743622bf400fc85f1cc3f326631ffd85332eaee204fef6b3b",
+      "sha256": "99e0bbf71bfa847b8e00ec19034d8517cb108cd433476ba93446357053ef879d"
+    },
+    {
+      "name": "sad",
+      "file": "sad.mjpeg",
+      "frames": 20,
+      "durations_ms": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "loops": 0,
+      "bytes": 737279,
+      "source_sha256": "d96810e9fe7252e127c5fadd4c562be4bc34216191e292e710e9261f36706c5a",
+      "sha256": "172c7f2a0347bc73d40e86fad853517d5a104da53d268829094c96435f4fbe6f"
+    },
+    {
+      "name": "shocked",
+      "file": "shocked.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 35756,
+      "source_sha256": "5ce41eda9cf7e8541eda5780e24defa3262f51e888cab4d50366fcca043e56cb",
+      "sha256": "15b8ef158b69b293c6250b7633245ff822827d782c05738e267e5bc14e85e8b9"
+    },
+    {
+      "name": "silly",
+      "file": "silly.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 36924,
+      "source_sha256": "93ca3c592ef92bb37b9a1f7b07dcdeb3c914ecd0482ade61cbf35810a21c1b14",
+      "sha256": "a398998b20912456ae96014fae452d902dedeacb6921e259a155463dc4aab18b"
+    },
+    {
+      "name": "sleepy",
+      "file": "sleepy.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 35680,
+      "source_sha256": "adc3497a9a8c19db9432e75444a3cdb42701b47ae05c1fcc68cf58596c833dea",
+      "sha256": "dee0958a7d5247c7bd8d01f6be82e63fa7e20f958877780558ed4c88c2d1434d"
+    },
+    {
+      "name": "surprised",
+      "file": "surprised.mjpeg",
+      "frames": 16,
+      "durations_ms": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "loops": 0,
+      "bytes": 585565,
+      "source_sha256": "9a10195b87197158455e70c15ee5de7b37de1dcfc0b4278aa65d8455c70c9bfb",
+      "sha256": "66fbadb963ab2245e3590e8e0029227a8028c0d39864f76fc690823a2f2c386f"
+    },
+    {
+      "name": "thinking",
+      "file": "thinking.mjpeg",
+      "frames": 24,
+      "durations_ms": [
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
+        100
+      ],
+      "loops": 0,
+      "bytes": 890307,
+      "source_sha256": "33a1e64782a486575db4ccb236725e5791f1c855066766acc583172e9527f795",
+      "sha256": "9cddca679c136df48e9f92c59b297b31a196a179865c06a6c57b758d66374d6f"
+    },
+    {
+      "name": "winking",
+      "file": "winking.jpg",
+      "frames": 1,
+      "durations_ms": [
+        100
+      ],
+      "loops": 1,
+      "bytes": 36926,
+      "source_sha256": "b918c40527908d7afe713a2e1ec2433b329325954e2171a8f8665959afb75e69",
+      "sha256": "44b9d8672092be6f8b8656b054bf3ac4e8166c6ee0bcaa88b1bebac49248ca6b"
+    }
+  ],
+  "stream_bytes": 5171675
+}

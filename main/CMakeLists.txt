@@ -27,6 +27,8 @@ set(SOURCES "audio/audio_codec.cc"
             "display/lvgl_display/lvgl_image.cc"
             "display/lvgl_display/gif/lvgl_gif.cc"
             "display/lvgl_display/gif/gifdec.c"
+            "display/lvgl_display/mjpeg_player.cc"
+            "display/lvgl_display/mjpeg_clip.cc"
             "display/lvgl_display/jpg/image_to_jpeg.cpp"
             "display/lvgl_display/jpg/jpeg_to_image.c"
             "protocols/protocol.cc"
@@ -243,7 +245,7 @@ elseif(CONFIG_BOARD_TYPE_M5STACK_STOPWATCH)
     set(BOARD_DIR "m5stack/stopwatch")
     set(BUILTIN_TEXT_FONT font_noto_sans_basic_30_4)
     set(BUILTIN_ICON_FONT font_material_symbols_30_4)
-    set(DEFAULT_EMOJI_COLLECTION "${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_DIR}/emoji")
+    set(DEFAULT_EMOJI_COLLECTION "${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_DIR}/mjpeg")
 elseif(CONFIG_BOARD_TYPE_M5STACK_CORE_P4)
     set(BOARD_DIR "m5stack/corep4")
     set(BUILTIN_TEXT_FONT font_noto_sans_basic_30_4)
