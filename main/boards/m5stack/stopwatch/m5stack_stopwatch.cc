@@ -11,6 +11,7 @@
 #include "assets/lang_config.h"
 #include "backlight.h"
 #include "button.h"
+#include "charging_icon.h"
 #include "codecs/es8311_audio_codec.h"
 #include "config.h"
 #include "display/lcd_display.h"
@@ -45,6 +46,28 @@ class RoundLcdDisplay : public SpiLcdDisplay {
 private:
     std::shared_ptr<LvglAllocatedImage> background_image_;
     lv_obj_t* charging_bolt_ = nullptr;
+
+    void UpdateChargingIconColor() {
+        if (charging_bolt_ != nullptr && battery_label_ != nullptr) {
+            lv_obj_set_style_image_recolor(
+                charging_bolt_, lv_obj_get_style_text_color(battery_label_, LV_PART_MAIN), 0);
+        }
+    }
+
+    void InitializeChargingIcon() {
+        if (battery_label_ == nullptr || charging_bolt_ != nullptr) {
+            return;
+        }
+        charging_bolt_ = lv_image_create(battery_label_);
+        lv_image_set_src(charging_bolt_, &stopwatch::kChargingBoltImage);
+        lv_image_set_pivot(charging_bolt_, 0, 0);
+        lv_image_set_scale(charging_bolt_, stopwatch::kChargingBoltScale);
+        lv_obj_set_pos(charging_bolt_, stopwatch::kChargingBoltX, stopwatch::kChargingBoltY);
+        lv_obj_add_flag(charging_bolt_, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(charging_bolt_, LV_OBJ_FLAG_IGNORE_LAYOUT);
+        lv_obj_set_style_image_recolor_opa(charging_bolt_, LV_OPA_COVER, 0);
+        UpdateChargingIconColor();
+    }
 
     void InitializeBackground() {
         if (background_image_ != nullptr) {
@@ -133,20 +156,7 @@ public:
             }
         }
 
-        if (battery_label_ != nullptr && charging_bolt_ == nullptr) {
-            // Center the bolt inside the body of the existing 30px battery glyph.
-            static const lv_point_precise_t points[] = {{15, 11}, {11, 15}, {15, 15}, {12, 18}};
-            charging_bolt_ = lv_line_create(battery_label_);
-            lv_line_set_points(charging_bolt_, points, 4);
-            lv_obj_set_pos(charging_bolt_, 0, 0);
-            lv_obj_set_style_line_width(charging_bolt_, 2, 0);
-            lv_obj_set_style_line_rounded(charging_bolt_, true, 0);
-            lv_obj_set_style_line_color(
-                charging_bolt_, lv_obj_get_style_text_color(battery_label_, LV_PART_MAIN), 0);
-            lv_obj_add_flag(charging_bolt_, LV_OBJ_FLAG_HIDDEN);
-            lv_obj_add_flag(charging_bolt_, LV_OBJ_FLAG_IGNORE_LAYOUT);
-        }
-
+        InitializeChargingIcon();
         lv_display_add_event_cb(display_, rounder_event_cb, LV_EVENT_INVALIDATE_AREA, NULL);
     }
 
@@ -181,10 +191,7 @@ public:
             lvgl_theme->set_text_color(lv_color_hex(0x123A52));
         }
         SpiLcdDisplay::SetTheme(theme);
-        if (charging_bolt_ != nullptr && battery_label_ != nullptr) {
-            lv_obj_set_style_line_color(
-                charging_bolt_, lv_obj_get_style_text_color(battery_label_, LV_PART_MAIN), 0);
-        }
+        UpdateChargingIconColor();
         if (background_image_ != nullptr) {
             // Keep the same background visible when fonts or themes are refreshed.
             if (top_bar_ != nullptr) {
