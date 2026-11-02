@@ -7,6 +7,36 @@
 按键控制和基于电压估算的电量显示。黄色 KEYA（G2）切换对话，蓝色 KEYB（G1）
 将音量每次增加 10%，超过 100% 后回到 0%。配网模式下黄色键切换音频测试。
 
+新增 `m5stack-stopwatch-rear-buttons` 扩展版支持背部三个按键，顶部按键仍保留原功能：
+
+| 背部信号 | 接口针脚 | 单击功能 |
+| --- | --- | --- |
+| GPIO3 | 2 | 切换语音对话（与黄色 KEYA 相同） |
+| GPIO19 / MUX_IO_2 | 5 | 音量加 10%，最高 100% |
+| GPIO20 / MUX_IO_1 | 3 | 音量减 10%，最低 0% |
+
+每个 GPIO 节点通过 10 kΩ 电阻上拉到 3.3 V，按键接在 GPIO 与 GND 之间，
+松开为高电平、按下为低电平，复用现有按键驱动的消抖。音量变化时显示百分比。
+GPIO3 的语音行为包含原黄色键的配网/音频测试逻辑。按键处理调度到应用主任务。
+
+背部 MUX_IO_1/2 默认连接 UART0（GPIO43/44），扩展版将 M5IOE1 G1 置高，
+切换到 GPIO20/19，并关闭 USB Serial/JTAG 控制台及驱动；此时背部 MUX 针脚
+不能用于 UART，GPIO19/20 也不能同时用于 USB 数据通信。USB 电源仍可使用。
+通过 USB 烧录时先断开 GPIO19/20 的外接按键及上拉电路，以免干扰 USB D−/D+；
+按原方式进入 ROM 下载模式并烧录，完成后再接回。GPIO3 是 ESP32-S3 的启动配置
+引脚，建议上电和复位时保持语音按键松开。
+
+构建扩展版（独立固件名称，使用相同的 S3 / 16 MiB Flash / 8 MiB PSRAM 配置）：
+
+```bash
+python3 scripts/build.py m5stack/stopwatch --name m5stack-stopwatch-rear-buttons --language zh-CN --zip
+```
+
+输出 `releases/v<project-version>_m5stack-stopwatch-rear-buttons.zip`。
+原 `m5stack-stopwatch` 版本不会接管背部 GPIO。手动 menuconfig 构建时，需关闭
+USB 主/副控制台和 USB Serial/JTAG 驱动，再启用 `StopWatch: three rear expansion buttons` 选项；发布
+构建应使用上述命令，以保留正确的扩展版身份。
+
 触摸控制器的复位线在初始化时释放，但尚未接入触摸事件；IMU、RTC、振动反馈和
 专门的低功耗策略也尚未接入本板卡的应用流程。
 
@@ -220,6 +250,6 @@ idf.py -p PORT flash monitor
 
 ## 实机验收
 
-编译通过不能替代硬件验证。烧录后需检查：圆屏显示、字幕边缘、亮度调节、两颗按键、
+编译通过不能替代硬件验证。烧录后需检查：圆屏显示、字幕边缘、亮度调节、顶部两颗按键、扩展版背部三颗按键（含音量上下限和快速交替点击）、
 录音与播放、唤醒与打断、Wi-Fi 断线重连，以及 USB/电池供电和充电状态。
 当前电量百分比为电压线性估算，不能视为精确的电池容量测量。

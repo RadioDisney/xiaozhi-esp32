@@ -4,7 +4,9 @@
 #include <esp_log.h>
 #include <material_symbols.h>
 #include <wifi_manager.h>
+#include <algorithm>
 #include <cstring>
+#include <memory>
 #include "M5IOE1.h"
 #include "M5PM1.h"
 #include "application.h"
@@ -236,6 +238,11 @@ private:
     M5IOE1 ioe_;
     Button button1_;
     Button button2_;
+#if CONFIG_STOPWATCH_REAR_BUTTONS
+    std::unique_ptr<Button> rear_chat_button_;
+    std::unique_ptr<Button> rear_volume_up_button_;
+    std::unique_ptr<Button> rear_volume_down_button_;
+#endif
     RoundLcdDisplay* display_;
     StopwatchBacklight* backlight_;
 
@@ -355,27 +362,63 @@ private:
         backlight_->RestoreBrightness();
     }
 
-    void InitializeButtons() {
-        // Button1: wake / toggle conversation
-        button1_.OnClick([this]() {
+    void HandleChatButton() {
+        Application::GetInstance().Schedule([this]() {
             auto& app = Application::GetInstance();
-            if (app.GetDeviceState() == kDeviceStateStarting && !WifiManager::GetInstance().IsConnected()) {
+            if (app.GetDeviceState() == kDeviceStateStarting &&
+                !WifiManager::GetInstance().IsConnected()) {
                 EnterWifiConfigMode();
                 return;
             }
             app.ToggleChatState();
         });
+    }
+
+    void ChangeVolume(int step, bool wrap = false) {
+        Application::GetInstance().Schedule([this, step, wrap]() {
+            auto* codec = GetAudioCodec();
+            int volume = codec->output_volume() + step;
+            volume = wrap && volume > 100 ? 0 : std::clamp(volume, 0, 100);
+            codec->SetOutputVolume(volume);
+            GetDisplay()->ShowNotification(std::string(Lang::Strings::VOLUME) + ":" +
+                                           std::to_string(volume) + "%");
+        });
+    }
+
+#if CONFIG_STOPWATCH_REAR_BUTTONS
+    void InitializeRearButtons() {
+        // Rear pin 3 = G20, pin 5 = G19 only when M5IOE1 G1 is high.
+        // Create the GPIO buttons after switching away from UART0.
+        m5ioe1_err_t err = M5IOE1_OK;
+        ioe_.pinModeWithRes(IOE_PIN_REAR_MUX, OUTPUT, &err);
+        if (err == M5IOE1_OK) {
+            err = ioe_.setDriveMode(IOE_PIN_REAR_MUX, M5IOE1_DRIVE_PUSHPULL);
+        }
+        if (err == M5IOE1_OK) {
+            ioe_.digitalWriteWithRes(IOE_PIN_REAR_MUX, HIGH, &err);
+        }
+        if (err != M5IOE1_OK) {
+            ESP_LOGE(TAG, "Failed to route rear pins to GPIO19/20; rear buttons disabled");
+            return;
+        }
+        rear_chat_button_ = std::make_unique<Button>(REAR_CHAT_BUTTON_GPIO, false);
+        rear_volume_up_button_ = std::make_unique<Button>(REAR_VOLUME_UP_BUTTON_GPIO, false);
+        rear_volume_down_button_ = std::make_unique<Button>(REAR_VOLUME_DOWN_BUTTON_GPIO, false);
+        rear_chat_button_->OnClick([this]() { HandleChatButton(); });
+        rear_volume_up_button_->OnClick([this]() { ChangeVolume(10); });
+        rear_volume_down_button_->OnClick([this]() { ChangeVolume(-10); });
+    }
+#endif
+
+    void InitializeButtons() {
+        // Button1: wake / toggle conversation
+        button1_.OnClick([this]() { HandleChatButton(); });
 
         // Button2: volume 0 -> 10 -> ... -> 100 -> 0
-        button2_.OnClick([this]() {
-            auto* codec = GetAudioCodec();
-            int volume = codec->output_volume() + 10;
-            if (volume > 100) {
-                volume = 0;
-            }
-            codec->SetOutputVolume(volume);
-            GetDisplay()->ShowNotification(std::string(Lang::Strings::VOLUME) + ":" + std::to_string(volume) + "%");
-        });
+        button2_.OnClick([this]() { ChangeVolume(10, true); });
+#if CONFIG_STOPWATCH_REAR_BUTTONS
+        InitializeRearButtons();
+#endif
     }
 
 public:

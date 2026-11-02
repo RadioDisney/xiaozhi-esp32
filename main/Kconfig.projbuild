@@ -666,6 +666,18 @@ choice BOARD_TYPE
         depends on IDF_TARGET_ESP32S3
 endchoice
 
+config STOPWATCH_REAR_BUTTONS
+    bool "StopWatch: three rear expansion buttons (GPIO3/19/20)"
+    depends on BOARD_TYPE_M5STACK_STOPWATCH
+    default n
+    help
+        Use active-low buttons with 10 kOhm pull-ups to 3.3 V: GPIO3 toggles
+        conversation, GPIO19 increases volume, GPIO20 decreases volume.
+        Routes the rear MUX pins to GPIO19/20 via M5IOE1 G1. USB data cannot
+        be used at the same time. Disable USB primary and secondary consoles
+        and the USB Serial/JTAG driver.
+        Build the m5stack-stopwatch-rear-buttons release variant for this wiring.
+
 config RESPEAKER_I2S_EXTERNAL_CLOCK_48K
     bool "ReSpeaker: XMOS supplies 48 kHz I2S clocks"
     depends on BOARD_TYPE_SEEED_XIAO_ESP32S3_RESPEAKER_XVF3800
