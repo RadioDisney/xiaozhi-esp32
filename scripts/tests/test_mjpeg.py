@@ -44,6 +44,7 @@ HOST = r'''
 #include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -102,6 +103,7 @@ inline void* heap_caps_aligned_alloc(size_t,size_t n,int){++allocations;return m
 inline void heap_caps_free(void* p){if(p){++frees;free(p);}}
 inline int64_t esp_timer_get_time(){return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();}
 #define ESP_LOGE(...) ((void)0)
+#define ESP_LOGI(...) ((void)0)
 constexpr int JPEG_ERR_OK=0,JPEG_PIXEL_FORMAT_RGB565_LE=1;
 struct jpeg_dec_config_t {int output_type=0;};
 #define DEFAULT_JPEG_DEC_CONFIG() {}
@@ -137,12 +139,33 @@ std::vector<uint8_t> Index(uint32_t count,uint32_t loops){
     return data;
 }
 std::vector<uint8_t> Jpeg(int color){return {255,216,(uint8_t)color,0,255,217};}
-template<class F>void Wait(F condition){
+template<class F>void WaitFor(F condition,int line){
     auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(3);
-    while(!condition()){assert(std::chrono::steady_clock::now()<deadline);std::this_thread::sleep_for(std::chrono::milliseconds(1));}
+    while(!condition()){
+        if(std::chrono::steady_clock::now()>=deadline){fprintf(stderr,"Wait timed out at driver.cc:%d\n",line);abort();}
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 }
+#define Wait(condition) WaitFor(condition,__LINE__)
 size_t Count(){std::lock_guard lock(gui);return published.size();}
 int Last(){std::lock_guard lock(gui);return published.empty()?0:published.back();}
+struct FileSource : MjpegFrameSource {
+    MjpegSourceInfo info{16,16,16,80,145,0};
+    std::mutex mutex;std::condition_variable cv;
+    bool blocked=false,entered=false,opened=false;uint8_t color=0x55;
+    std::atomic<int> decode_begins=0,decode_ends=0;
+    ~FileSource() override {if(opened)assert(gui_depth==0);}
+    bool Open() override {assert(gui_depth==0);opened=true;return true;}
+    const MjpegSourceInfo& Info() const override {return info;}
+    MjpegFrame Frame(uint32_t n) const override {assert(n<info.frame_count);return {n*6,6,20};}
+    void BeginDecodeMeasurement() override {assert(gui_depth==0);++decode_begins;}
+    void EndDecodeMeasurement() override {assert(gui_depth==0);++decode_ends;}
+    bool ReadFrame(uint32_t n,std::span<uint8_t> out) override {
+        assert(gui_depth==0 && n<info.frame_count && out.size()==6);
+        {std::unique_lock lock(mutex);entered=true;cv.notify_all();cv.wait(lock,[&]{return !blocked;});}
+        auto bytes=Jpeg(color);memcpy(out.data(),bytes.data(),bytes.size());return true;
+    }
+};
 int main(){
     auto data=Jpeg(0x11);auto index=Index(1,1);assert(MjpegClip::Parse(data,index));
     for(size_t n=0;n<index.size();n++)assert(!MjpegClip::Parse(data,std::span(index).first(n)));
@@ -173,8 +196,40 @@ int main(){
     auto broken=index;broken[0]=0;assert(!player->Start(Jpeg(0x44),broken));
     assert(player->Start(Jpeg(0x66),index));Wait([]{return failures>0;});assert(Count()==stopped);
     assert(player->Start(Jpeg(0x44),index));Wait([]{return Last()==0x44;});
-    assert(allocations==4);player.reset();assert(allocations==frees&&handles==0);
+    assert(allocations==4);
+    auto source=std::make_shared<FileSource>();source->blocked=true;
+    assert(player->StartSource(source));
+    {std::unique_lock lock(source->mutex);source->cv.wait(lock,[&]{return source->entered;});}
+    // A blocked NAND read must not hold the GUI lock or publish after replacement.
+    auto before=Count();assert(player->Start(Jpeg(0x77),index));
+    {std::lock_guard lock(source->mutex);source->blocked=false;source->cv.notify_all();}
+    Wait([]{return Last()==0x77;});assert(Count()==before+1);
+    auto streaming=std::make_shared<FileSource>();
+    assert(player->StartSource(streaming));Wait([]{return Last()==0x55;});
+    player->Pause();paused=Count();std::this_thread::sleep_for(std::chrono::milliseconds(50));assert(Count()==paused);
+    player->Resume();Wait([=]{return Count()>paused;});
+    player->Stop();assert(allocations==4);
+    Wait([&]{return streaming->decode_begins==streaming->decode_ends;});
+    auto decode_failure=std::make_shared<FileSource>();decode_failure->color=0x66;
+    auto failures_before=failures.load();assert(player->StartSource(decode_failure));
+    Wait([&]{return failures>failures_before && decode_failure->decode_ends>0;});
+    assert(decode_failure->decode_begins==decode_failure->decode_ends);
+    player->Stop();
+    auto guarded=std::make_shared<FileSource>();std::weak_ptr<FileSource> weak=guarded;
+    before=Count();assert(player->StartSource(guarded));guarded.reset();
+    Wait([=]{return Count()>before;});player->Pause();
+    std::this_thread::sleep_for(std::chrono::milliseconds(40));
+    player->Stop();Wait([&]{return weak.expired();}); // Paused file closes off the GUI thread.
+    player.reset();assert(allocations==frees&&handles==0);
     {std::lock_guard lock(gui);assert(image.src==nullptr);}
+    auto prior_allocations=allocations.load();
+    player=std::make_unique<MjpegPlayer>(&display,&image,&label);
+    before=Count();assert(player->StartSource(std::make_shared<FileSource>()));
+    Wait([=]{return Last()==0x55 && Count()>before;});
+    assert(allocations==prior_allocations+3); // No whole-clip cache for file playback.
+    assert(player->Start(Jpeg(0x44),index));Wait([]{return Last()==0x44;});
+    assert(allocations==prior_allocations+4); // Lazy cache remains available to embedded clips.
+    player.reset();assert(allocations==frees&&handles==0);
     for(auto& task:tasks)task->thread.join();
 }
 '''

@@ -245,7 +245,9 @@ elseif(CONFIG_BOARD_TYPE_M5STACK_STOPWATCH)
     set(BOARD_DIR "m5stack/stopwatch")
     set(BUILTIN_TEXT_FONT font_noto_sans_basic_30_4)
     set(BUILTIN_ICON_FONT font_material_symbols_30_4)
-    set(DEFAULT_EMOJI_COLLECTION "${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_DIR}/mjpeg")
+    if(NOT CONFIG_STOPWATCH_NAND_EMOJIS)
+        set(DEFAULT_EMOJI_COLLECTION "${CMAKE_CURRENT_SOURCE_DIR}/boards/${BOARD_DIR}/mjpeg")
+    endif()
 elseif(CONFIG_BOARD_TYPE_M5STACK_CORE_P4)
     set(BOARD_DIR "m5stack/corep4")
     set(BUILTIN_TEXT_FONT font_noto_sans_basic_30_4)
@@ -1161,6 +1163,13 @@ if(CONFIG_BOARD_TYPE_ESP32_P4_FUNCTION_EV_BOARD)
         sdmmc
     )
 endif()
+if(CONFIG_STOPWATCH_NAND)
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA esp_blockdev spi_nand_flash joltwallet__littlefs)
+    if(CONFIG_STOPWATCH_USB_CONSOLE)
+        list(APPEND MAIN_PRIV_REQUIRES_EXTRA esp_driver_usb_serial_jtag)
+    endif()
+endif()
+
 idf_component_register(SRCS ${SOURCES}
                     EMBED_FILES ${LANG_SOUNDS} ${COMMON_SOUNDS}
                     INCLUDE_DIRS ${INCLUDE_DIRS}
@@ -1195,6 +1204,17 @@ idf_component_register(SRCS ${SOURCES}
 # dialect; pin the baseline so main/ does not depend on it.
 if(NOT CMAKE_BUILD_EARLY_EXPANSION)
     target_compile_options(${COMPONENT_LIB} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=gnu++23>)
+    if(CONFIG_STOPWATCH_NAND)
+        target_link_options(${COMPONENT_LIB} INTERFACE "-Wl,--wrap=dhara_nand_copy")
+    endif()
+    if(CONFIG_STOPWATCH_NAND_EMOJIS)
+        target_link_options(${COMPONENT_LIB} INTERFACE
+            "-Wl,--wrap=dhara_nand_read"
+            "-Wl,--wrap=dhara_nand_prog"
+            "-Wl,--wrap=dhara_nand_erase"
+            "-Wl,--wrap=dhara_nand_mark_bad"
+            "-Wl,--wrap=spi_device_transmit")
+    endif()
     if(CONFIG_BOARD_TYPE_M5STACK_STOPWATCH)
         target_add_binary_data(${COMPONENT_LIB}
             "boards/m5stack/stopwatch/assets/stopwatch_background.jpg" BINARY

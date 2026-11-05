@@ -1,5 +1,13 @@
 ## IDF Component Manager Manifest File
 dependencies:
+  espressif/spi_nand_flash:
+    version: "==1.4.4"
+    rules:
+    - if: target in [esp32s3]
+  joltwallet/littlefs:
+    version: "==1.23.0"
+    rules:
+    - if: target in [esp32s3]
   espressif/ip101:
     version: ^1.1.0
     rules:

@@ -33,6 +33,18 @@ class StopwatchButtonsTest(unittest.TestCase):
             #include <vector>
             #include "config.h"
             #define ESP_LOGE(...) ((void)0)
+            #define ESP_LOGI(...) ((void)0)
+            #ifndef CONFIG_STOPWATCH_AUTO_USB_KEYS
+            #define CONFIG_STOPWATCH_AUTO_USB_KEYS 0
+            #endif
+            #ifndef TEST_USB_HOST_CONNECTED
+            #define TEST_USB_HOST_CONNECTED 0
+            #endif
+            #define EXPECT_USB_MODE (CONFIG_STOPWATCH_USB_CONSOLE && (!CONFIG_STOPWATCH_AUTO_USB_KEYS || TEST_USB_HOST_CONNECTED))
+            int host_checks=0,boot_waits=0;
+            bool usb_serial_jtag_is_connected(){++host_checks;return TEST_USB_HOST_CONNECTED;}
+            #define pdMS_TO_TICKS(n) (n)
+            void vTaskDelay(int ms){assert(ms==50);++boot_waits;}
             constexpr int M5IOE1_PIN_1=1, OUTPUT=1, HIGH=1;
             constexpr int M5IOE1_OK=0, M5IOE1_DRIVE_PUSHPULL=0;
             constexpr int kDeviceStateStarting=0, kDeviceStateIdle=1;
@@ -93,11 +105,17 @@ class StopwatchButtonsTest(unittest.TestCase):
                 assert(board.codec.volume==100);app.Drain();assert(board.codec.volume==0);
             #if CONFIG_STOPWATCH_REAR_BUTTONS
                 assert(board.ioe_.calls==3 && board.ioe_.level==HIGH);
+            #if CONFIG_STOPWATCH_USB_CONSOLE
+                assert((Button::rear_pins==std::vector<int>{3}));
+                assert(!board.rear_volume_up_button_ && !board.rear_volume_down_button_);
+            #else
                 assert((Button::rear_pins==std::vector<int>{3,19,20}));
+            #endif
                 board.rear_chat_button_->click();app.Drain();assert(app.toggles==2);
                 app.state=kDeviceStateStarting;
                 board.rear_chat_button_->click();app.Drain();assert(board.wifi_config==2);
                 app.state=kDeviceStateIdle;
+            #if !CONFIG_STOPWATCH_USB_CONSOLE
                 board.codec.volume=95;board.rear_volume_up_button_->click();
                 app.Drain();assert(board.codec.volume==100);
                 board.rear_volume_up_button_->click();app.Drain();assert(board.codec.volume==100);
@@ -109,6 +127,7 @@ class StopwatchButtonsTest(unittest.TestCase):
                 board.rear_volume_down_button_->click();board.button2_.click();
                 assert(board.codec.volume==50);app.Drain();assert(board.codec.volume==70);
                 assert(board.display.notification=="volume:70%");
+            #endif
                 for(int fail_at:{1,2,3}){
                     Board failed;failed.ioe_.fail_at=fail_at;failed.InitializeButtons();
                     assert(failed.ioe_.calls==fail_at);
@@ -116,12 +135,16 @@ class StopwatchButtonsTest(unittest.TestCase):
                            !failed.rear_volume_down_button_);
                     failed.button1_.click();app.Drain();
                 }
-                assert(Button::rear_pins.size()==3);
+                assert(Button::rear_pins.size()==(CONFIG_STOPWATCH_USB_CONSOLE?1:3));
             #else
-                assert(Button::rear_pins.empty() && board.ioe_.calls==0);
+                assert(Button::rear_pins.empty());
+                assert(board.ioe_.calls==(CONFIG_STOPWATCH_USB_CONSOLE?3:0));
             #endif
             }
         '''
+        driver = driver.replace("#if CONFIG_STOPWATCH_USB_CONSOLE", "#if EXPECT_USB_MODE")
+        driver = driver.replace("#if !CONFIG_STOPWATCH_USB_CONSOLE", "#if !EXPECT_USB_MODE")
+        driver = driver.replace("CONFIG_STOPWATCH_USB_CONSOLE?1:3", "EXPECT_USB_MODE?1:3")
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             (work / "driver").mkdir()
@@ -134,18 +157,25 @@ class StopwatchButtonsTest(unittest.TestCase):
             program.write_text(textwrap.dedent(platform) + '''
                 struct Board {
                     Mux ioe_;Codec codec;Display display;int wifi_config=0;
+                    bool rear_usb_mode_=CONFIG_STOPWATCH_USB_CONSOLE;
                     Button button1_{BUTTON1_GPIO},button2_{BUTTON2_GPIO};
                     std::unique_ptr<Button> rear_chat_button_,rear_volume_up_button_,rear_volume_down_button_;
                     Codec* GetAudioCodec(){return &codec;}
                     Display* GetDisplay(){return &display;}
                     void EnterWifiConfigMode(){++wifi_config;}
-                ''' + methods + "\n#if CONFIG_STOPWATCH_REAR_BUTTONS\n" + rear_method +
+                ''' + methods + "\n#if CONFIG_STOPWATCH_REAR_BUTTONS || CONFIG_STOPWATCH_USB_CONSOLE\n" + rear_method +
                 "\n#endif\n};\n" + driver)
             compiler = shlex.split(os.environ.get("CXX", "c++"))
-            for rear in (0, 1):
-                with self.subTest(rear=rear):
-                    executable = work / f"buttons-{rear}"
+            for rear, usb, auto, host in ((0,0,0,0),(1,0,0,0),(1,1,0,0),(0,1,0,0),
+                                          (1,1,1,0),(1,1,1,1)):
+                with self.subTest(rear=rear, usb=usb, auto=auto, host=host):
+                    executable = work / f"buttons-{rear}-{usb}-{auto}-{host}"
                     command = compiler + ["-std=c++23", f"-DCONFIG_STOPWATCH_REAR_BUTTONS={rear}",
+                                          f"-DCONFIG_STOPWATCH_USB_CONSOLE={usb}",
+                                          f"-DCONFIG_STOPWATCH_AUTO_USB_KEYS={auto}",
+                                          f"-DTEST_USB_HOST_CONNECTED={host}",
+                                          f"-DCONFIG_ESP_CONSOLE_USB_SERIAL_JTAG={usb}",
+                                          f"-DCONFIG_USJ_ENABLE_USB_SERIAL_JTAG={usb}",
                                           "-I" + str(work), "-I" + str(BOARD), str(program),
                                           "-o", str(executable)]
                     subprocess.run(command, check=True)
@@ -155,6 +185,11 @@ class StopwatchButtonsTest(unittest.TestCase):
                 "-I" + str(work), "-I" + str(BOARD), str(program)], capture_output=True, text=True)
             self.assertNotEqual(conflict.returncode, 0)
             self.assertIn("disable USB consoles", conflict.stderr)
+            missing_console = subprocess.run(compiler + ["-std=c++23", "-fsyntax-only",
+                "-DCONFIG_STOPWATCH_REAR_BUTTONS=1", "-DCONFIG_STOPWATCH_USB_CONSOLE=1",
+                "-I" + str(work), "-I" + str(BOARD), str(program)], capture_output=True, text=True)
+            self.assertNotEqual(missing_console.returncode, 0)
+            self.assertIn("requires USB Serial/JTAG console and module", missing_console.stderr)
 
 
 if __name__ == "__main__":

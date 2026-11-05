@@ -23,6 +23,7 @@ MjpegPlayer::~MjpegPlayer() {
             DisplayLockGuard lock(display_);
             stopping_ = true;
             playing_ = false;
+            source_.reset();
             ++generation_;
         }
         xTaskNotifyGive(task_);
@@ -57,14 +58,18 @@ void MjpegPlayer::ReleaseBuffers() {
     }
 }
 
-bool MjpegPlayer::Initialize() {
+bool MjpegPlayer::Initialize(bool memory_stream) {
 #ifdef CONFIG_IDF_TARGET_ESP32
     return false;
 #else
+    if (memory_stream && stream_ == nullptr) {
+        stream_ = static_cast<uint8_t*>(
+            heap_caps_malloc(MjpegClip::kMaxStreamBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+        if (stream_ == nullptr)
+            return false;
+    }
     if (task_ != nullptr)
         return true;
-    stream_ = static_cast<uint8_t*>(
-        heap_caps_malloc(MjpegClip::kMaxStreamBytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     input_ = static_cast<uint8_t*>(heap_caps_aligned_alloc(16, MjpegClip::kMaxFrameBytes,
                                                            MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
     for (auto*& pixels : pixels_) {
@@ -74,7 +79,7 @@ bool MjpegPlayer::Initialize() {
     exited_ = xSemaphoreCreateBinary();
     jpeg_dec_config_t config = DEFAULT_JPEG_DEC_CONFIG();
     config.output_type = JPEG_PIXEL_FORMAT_RGB565_LE;
-    if (!stream_ || !input_ || !pixels_[0] || !pixels_[1] || !exited_ ||
+    if (!input_ || !pixels_[0] || !pixels_[1] || !exited_ ||
         jpeg_dec_open(&config, &decoder_) != JPEG_ERR_OK) {
         ESP_LOGE(TAG, "Cannot allocate bounded MJPEG buffers");
         ReleaseBuffers();
@@ -98,13 +103,28 @@ bool MjpegPlayer::Start(std::span<const uint8_t> data, std::span<const uint8_t> 
         return false;
     }
     DisplayLockGuard lock(display_);
-    if (!Initialize())
+    if (!Initialize(true))
         return false;
     // One bounded copy per emotion change detaches playback from assets mmap lifetime.
     // The worker reads this cache under the display lock, then decodes its own input.
     std::memcpy(stream_, data.data(), data.size());
     clip_ = *parsed;
     clip_->data = {stream_, data.size()};
+    source_.reset();
+    ++generation_;
+    playing_ = !paused_;
+    xTaskNotifyGive(task_);
+    return true;
+}
+
+bool MjpegPlayer::StartSource(std::shared_ptr<MjpegFrameSource> source) {
+    if (!source)
+        return false;
+    DisplayLockGuard lock(display_);
+    if (!Initialize(false))
+        return false;
+    clip_.reset();
+    source_ = std::move(source);
     ++generation_;
     playing_ = !paused_;
     xTaskNotifyGive(task_);
@@ -115,6 +135,7 @@ void MjpegPlayer::Stop() {
     DisplayLockGuard lock(display_);
     playing_ = false;
     clip_.reset();
+    source_.reset();
     ++generation_;
     if (task_ != nullptr)
         xTaskNotifyGive(task_);
@@ -132,7 +153,7 @@ void MjpegPlayer::Pause() {
 void MjpegPlayer::Resume() {
     DisplayLockGuard lock(display_);
     paused_ = false;
-    playing_ = clip_.has_value();
+    playing_ = clip_.has_value() || source_ != nullptr;
     ++generation_;
     if (task_ != nullptr)
         xTaskNotifyGive(task_);
@@ -149,36 +170,94 @@ void MjpegPlayer::Run() {
     uint32_t frame_index = 0;
     uint32_t loops_done = 0;
     int64_t deadline = 0;
+    int64_t started = 0, io_us = 0, decode_us = 0;
+    uint32_t displayed = 0, skipped_frames = 0, reported_loop = 0;
+    std::shared_ptr<MjpegFrameSource> active_source;
+    auto fail = [this](uint32_t generation, const char* reason) {
+        DisplayLockGuard lock(display_);
+        if (generation == generation_)
+            playing_ = false;
+        ESP_LOGE(TAG, "%s", reason);
+    };
     while (true) {
         MjpegFrame frame{};
         uint16_t width = 0, height = 0, x = 0, y = 0;
-        uint32_t generation = 0;
+        uint32_t frame_count = 0, loops = 0, generation = 0;
         int back = 0;
         bool ready = false;
+        bool changed = false;
+        std::shared_ptr<MjpegFrameSource> source;
         {
             DisplayLockGuard lock(display_);
             if (stopping_)
                 break;
-            if (playing_ && clip_) {
+            source = source_;
+            if (playing_ && (clip_ || source_)) {
                 generation = generation_;
-                if (generation != current_generation) {
+                changed = generation != current_generation;
+                if (changed) {
                     current_generation = generation;
                     frame_index = loops_done = 0;
                     deadline = esp_timer_get_time();
+                    started = deadline;
+                    io_us = decode_us = 0;
+                    displayed = skipped_frames = reported_loop = 0;
                 }
-                frame = clip_->frames[frame_index];
-                width = clip_->width;
-                height = clip_->height;
-                x = clip_->x;
-                y = clip_->y;
                 back = 1 - front_;
-                std::memcpy(input_, stream_ + frame.offset, frame.size);
+                if (!source) {
+                    frame = clip_->frames[frame_index];
+                    width = clip_->width;
+                    height = clip_->height;
+                    x = clip_->x;
+                    y = clip_->y;
+                    frame_count = clip_->frame_count;
+                    loops = clip_->loops;
+                    std::memcpy(input_, stream_ + frame.offset, frame.size);
+                }
                 ready = true;
             }
         }
         if (!ready) {
+            // Keep paused sources pinned on this worker. Stop/replacement can
+            // then release the member under the GUI lock without closing files.
+            active_source = std::move(source);
             ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
             continue;
+        }
+        if (source) {
+            active_source = source;
+            if (changed && !source->Open()) {
+                fail(generation, "MJPEG source could not open");
+                continue;
+            }
+            const auto& info = source->Info();
+            width = info.width;
+            height = info.height;
+            x = info.x;
+            y = info.y;
+            frame_count = info.frame_count;
+            loops = info.loops;
+            if (!width || !height || width > 466 || height > 466 || x + width > display_->width() ||
+                y + height > display_->height() || !frame_count || frame_count > 256 ||
+                loops > 10000 || frame_index >= frame_count) {
+                fail(generation, "Invalid MJPEG source geometry or frame count");
+                continue;
+            }
+            frame = source->Frame(frame_index);
+            if (frame.size < 4 || frame.size > MjpegClip::kMaxFrameBytes ||
+                frame.duration_ms < 10 || frame.duration_ms > 10000) {
+                fail(generation, "Invalid MJPEG source frame");
+                continue;
+            }
+            const int64_t read_started = esp_timer_get_time();
+            const bool read = source->ReadFrame(frame_index, {input_, frame.size});
+            io_us += esp_timer_get_time() - read_started;
+            if (!read) {
+                fail(generation, "MJPEG source frame read failed");
+                continue;
+            }
+        } else {
+            active_source.reset();
         }
         jpeg_dec_io_t io{};
         io.inbuf = input_;
@@ -186,25 +265,27 @@ void MjpegPlayer::Run() {
         io.outbuf = pixels_[back];
         jpeg_dec_header_info_t info{};
         int output_size = 0;
-        bool decoded = jpeg_dec_parse_header(decoder_, &io, &info) == JPEG_ERR_OK &&
-                       info.width == width && info.height == height &&
-                       jpeg_dec_get_outbuf_len(decoder_, &output_size) == JPEG_ERR_OK &&
-                       output_size == width * height * 2 && output_size > 0 &&
-                       static_cast<size_t>(output_size) <= kPixelBytes &&
-                       jpeg_dec_process(decoder_, &io) == JPEG_ERR_OK;
+        if (source)
+            source->BeginDecodeMeasurement();
+        const int64_t decode_started = esp_timer_get_time();
+        const bool decoded = jpeg_dec_parse_header(decoder_, &io, &info) == JPEG_ERR_OK &&
+                             info.width == width && info.height == height &&
+                             jpeg_dec_get_outbuf_len(decoder_, &output_size) == JPEG_ERR_OK &&
+                             output_size == width * height * 2 && output_size > 0 &&
+                             static_cast<size_t>(output_size) <= kPixelBytes &&
+                             jpeg_dec_process(decoder_, &io) == JPEG_ERR_OK;
+        decode_us += esp_timer_get_time() - decode_started;
+        if (source)
+            source->EndDecodeMeasurement();
         if (!decoded) {
-            DisplayLockGuard lock(display_);
-            if (generation == generation_)
-                playing_ = false;
-            ESP_LOGE(TAG, "JPEG frame decode failed: %lu", static_cast<unsigned long>(frame_index));
+            fail(generation, "JPEG frame decode failed");
             continue;
         }
-        // Decode ahead, but never hold the GUI lock while decoding or waiting.
         while (IsCurrent(generation)) {
             const int64_t remaining = deadline - esp_timer_get_time();
             if (remaining <= 0)
                 break;
-            auto milliseconds = static_cast<uint32_t>((remaining + 999) / 1000);
+            const auto milliseconds = static_cast<uint32_t>((remaining + 999) / 1000);
             ulTaskNotifyTake(pdTRUE, std::max<TickType_t>(1, pdMS_TO_TICKS(milliseconds)));
         }
         {
@@ -226,35 +307,51 @@ void MjpegPlayer::Run() {
             lv_obj_add_flag(label_, LV_OBJ_FLAG_HIDDEN);
             lv_obj_remove_flag(target_, LV_OBJ_FLAG_HIDDEN);
             front_ = back;
+            ++displayed;
+            if (source && frame_index == 0 && loops_done == 0)
+                ESP_LOGI(TAG, "MJPEG source visible: %ux%u, %lu frames", width, height,
+                         static_cast<unsigned long>(frame_count));
             deadline += static_cast<int64_t>(frame.duration_ms) * 1000;
-            ++frame_index;
-            if (frame_index == clip_->frame_count) {
+            if (++frame_index == frame_count) {
                 frame_index = 0;
                 ++loops_done;
-                if (clip_->loops != 0 && loops_done >= clip_->loops)
+                if (loops != 0 && loops_done >= loops)
                     playing_ = false;
             }
-            // Drop overdue frames instead of building a queue or slowing down clip timing.
-            for (size_t skipped = 0; playing_ && skipped < MjpegClip::kMaxFrames; ++skipped) {
-                const auto duration =
-                    static_cast<int64_t>(clip_->frames[frame_index].duration_ms) * 1000;
+            const auto duration_at = [&](uint32_t index) {
+                return source ? source->Frame(index).duration_ms : clip_->frames[index].duration_ms;
+            };
+            // Keep source timing when I/O or decoding takes longer than a frame.
+            for (size_t skipped = 0; playing_ && skipped < 256; ++skipped) {
+                const auto duration = static_cast<int64_t>(duration_at(frame_index)) * 1000;
                 if (deadline + duration > esp_timer_get_time())
                     break;
-                if (clip_->loops != 0 && loops_done + 1 >= clip_->loops &&
-                    frame_index + 1 == clip_->frame_count)
+                if (loops != 0 && loops_done + 1 >= loops && frame_index + 1 == frame_count)
                     break;
                 deadline += duration;
-                if (++frame_index == clip_->frame_count) {
+                ++skipped_frames;
+                if (++frame_index == frame_count) {
                     frame_index = 0;
                     ++loops_done;
-                    if (clip_->loops != 0 && loops_done >= clip_->loops)
+                    if (loops != 0 && loops_done >= loops)
                         playing_ = false;
                 }
             }
             if (deadline < esp_timer_get_time() - 1000000)
                 deadline = esp_timer_get_time();
+            if (source && loops_done != reported_loop) {
+                reported_loop = loops_done;
+                ESP_LOGI(TAG,
+                         "MJPEG stats: displayed=%lu skipped=%lu read_us=%lld decode_us=%lld "
+                         "elapsed_us=%lld",
+                         static_cast<unsigned long>(displayed),
+                         static_cast<unsigned long>(skipped_frames), static_cast<long long>(io_us),
+                         static_cast<long long>(decode_us),
+                         static_cast<long long>(esp_timer_get_time() - started));
+            }
         }
     }
+    active_source.reset();
 #endif
     xSemaphoreGive(exited_);
     vTaskDelete(nullptr);

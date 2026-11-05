@@ -15,15 +15,16 @@
 | GPIO19 / MUX_IO_2 | 5 | 音量加 10%，最高 100% |
 | GPIO20 / MUX_IO_1 | 3 | 音量减 10%，最低 0% |
 
-每个 GPIO 节点通过 10 kΩ 电阻上拉到 3.3 V，按键接在 GPIO 与 GND 之间，
-松开为高电平、按下为低电平，复用现有按键驱动的消抖。音量变化时显示百分比。
+按键接在 GPIO 与 GND 之间，软件启用内部上拉，松开为高电平、按下为低电平，
+复用现有按键驱动的消抖。GPIO19/20 不再接外部上拉，以免给 USB 数据线增加负载；
+GPIO3 原有的 10 kΩ 上拉可以保留。音量变化时显示百分比。
 GPIO3 的语音行为包含原黄色键的配网/音频测试逻辑。按键处理调度到应用主任务。
 
 背部 MUX_IO_1/2 默认连接 UART0（GPIO43/44），扩展版将 M5IOE1 G1 置高，
 切换到 GPIO20/19，并关闭 USB Serial/JTAG 控制台及驱动；此时背部 MUX 针脚
 不能用于 UART，GPIO19/20 也不能同时用于 USB 数据通信。USB 电源仍可使用。
-通过 USB 烧录时先断开 GPIO19/20 的外接按键及上拉电路，以免干扰 USB D−/D+；
-按原方式进入 ROM 下载模式并烧录，完成后再接回。GPIO3 是 ESP32-S3 的启动配置
+移除 GPIO19/20 的外部上拉后，可保持松开的按键连接并进入 ROM 下载模式烧录。
+USB 模式下两颗背部音量键不使用。GPIO3 是 ESP32-S3 的启动配置
 引脚，建议上电和复位时保持语音按键松开。
 
 构建扩展版（独立固件名称，使用相同的 S3 / 16 MiB Flash / 8 MiB PSRAM 配置）：
@@ -33,7 +34,8 @@ python3 scripts/build.py m5stack/stopwatch --name m5stack-stopwatch-rear-buttons
 ```
 
 输出 `releases/v<project-version>_m5stack-stopwatch-rear-buttons.zip`。
-原 `m5stack-stopwatch` 版本不会接管背部 GPIO。手动 menuconfig 构建时，需关闭
+原 `m5stack-stopwatch` 版本不会接管背部 GPIO。手动 menuconfig 构建三按键模式时，需关闭
+`StopWatch: reserve GPIO19/20 for USB logging`，关闭
 USB 主/副控制台和 USB Serial/JTAG 驱动，再启用 `StopWatch: three rear expansion buttons` 选项；发布
 构建应使用上述命令，以保留正确的扩展版身份。
 
@@ -131,7 +133,40 @@ releases/v<project-version>_m5stack-stopwatch.zip
 
 构建脚本会更新本地 sdkconfig 和 build 状态，切换其他板卡后需重新运行上述命令。
 
-## Firecat 表情
+## 外部 NAND 扩展
+
+GD5F1GM7UEYIGR（128 MiB）扩展支持独立 SPI3、Dhara FTL 和 LittleFS，
+提供默认输出 USB 日志的 SIO 5 MHz 和四线 QOUT 40 MHz 工作版；更换 NAND 后已逐级验证
+1、5、10、20、40 MHz，新接线仍应先降到 1–5 MHz 验证。GPIO3 语音键和顶部按键可用，
+这些硬件诊断变体停用 GPIO19/20 两颗音量键，并将引脚保留给 USB。
+80 MHz 尝试未通过文件自检，已恢复 40 MHz 并重新验证原文件及读写。
+接线、首次初始化、构建、
+后台测试和实机验收见 [NAND 扩展说明](NAND.md)。原版与仅三按键版不接管 NAND 引脚。
+
+## NAND MJPEG 表情与自动按键模式
+
+当前设备资源为 **12 fps 高清版**，26.34 MB、21 个表情。
+资源包为 `releases/firecat-nand-466-12fps-hq.pack`，验证结果见
+[12 fps 资源验证记录](NAND_EMOJI_12FPS_TEST_RESULTS.md)。以下 24 fps 数据为首次迁移说明。
+
+`m5stack-stopwatch-nand-mjpeg-auto` 使用外部 NAND 中的 21 个全屏 MJPEG 表情，
+不再把旧表情包放入 NOR 资源。新资源共 47,406,634 字节、2085 帧，保留原始 466×466
+画面和 24 fps 时间线，后台按帧读取并使用 ESP32-S3 软件 JPEG 解码。
+
+开机连接电脑时保留 USB 调试；电池或纯供电充电器开机时，GPIO19/20 使用内部上拉
+作为音量加/减。模式固定到下一次重启。GPIO3 和顶部按键继续可用。
+
+```bash
+python scripts/build.py m5stack/stopwatch \
+  --name m5stack-stopwatch-nand-mjpeg-auto --language zh-CN --zip
+```
+
+安装方法和维护命令见 [NAND 表情说明](NAND_EMOJIS.md)，
+实机结果见 [NAND 表情验收记录](NAND_EMOJI_TEST_RESULTS.md)。
+
+## 旧版内置 Firecat 表情
+
+以下资源用于原版及硬件诊断变体；NAND MJPEG 自动模式使用上一节的外部资源。
 
 `emoji/` 保存 21 个原始 466×466 透明 GIF，`mjpeg/` 是固件打包输入，包含
 6 个 MJPEG 动画、15 个 JPEG 静态图及各自的 `.idx` 帧索引。动画包括 `neutral`、

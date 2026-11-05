@@ -1253,8 +1253,10 @@ bool LcdDisplay::SetEmotion(const char* emotion) {
         } else {
             mjpeg_controller_->Resume();
         }
-        shown = mjpeg_controller_->Start({image->RawData(), image->RawSize()},
-                                         {image->IndexData(), image->IndexSize()});
+        auto source = image->CreateMjpegSource();
+        shown = source ? mjpeg_controller_->StartSource(std::move(source))
+                       : mjpeg_controller_->Start({image->RawData(), image->RawSize()},
+                                                  {image->IndexData(), image->IndexSize()});
     } else if (image->IsGif()) {
         lv_obj_center(emoji_image_);
         // Create new GIF controller

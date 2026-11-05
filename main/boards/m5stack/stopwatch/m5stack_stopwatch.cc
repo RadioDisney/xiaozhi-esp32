@@ -7,6 +7,9 @@
 #include <algorithm>
 #include <cstring>
 #include <memory>
+#if CONFIG_STOPWATCH_AUTO_USB_KEYS
+#include <driver/usb_serial_jtag.h>
+#endif
 #include "M5IOE1.h"
 #include "M5PM1.h"
 #include "application.h"
@@ -20,6 +23,7 @@
 #include "esp_lcd_co5300.h"
 #include "jpg/jpeg_to_image.h"
 #include "lvgl_theme.h"
+#include "nand_storage.h"
 #include "wifi_board.h"
 
 #define TAG "M5StackStopwatch"
@@ -101,6 +105,23 @@ private:
     }
 
 public:
+#if CONFIG_STOPWATCH_NAND_EMOJIS
+    void InstallNandEmojis(std::shared_ptr<stopwatch::NandEmojiCatalog> catalog) {
+        auto collection = std::make_shared<EmojiCollection>();
+        for (size_t i = 0; i < stopwatch::kNandEmotionNames.size(); ++i) {
+            collection->AddEmoji(
+                std::string(stopwatch::kNandEmotionNames[i]),
+                new LvglMjpegSourceImage([catalog, i]() { return catalog->CreateSource(i); }));
+        }
+        DisplayLockGuard lock(this);
+        auto& manager = LvglThemeManager::GetInstance();
+        for (const char* name : {"light", "dark"}) {
+            if (auto* theme = manager.GetTheme(name))
+                theme->set_emoji_collection(collection);
+        }
+        SetEmotion("neutral");
+    }
+#endif
     static void rounder_event_cb(lv_event_t* e) {
         lv_area_t* area = static_cast<lv_area_t*>(lv_event_get_param(e));
         area->x1 = (area->x1 >> 1) << 1;
@@ -238,6 +259,14 @@ private:
     M5IOE1 ioe_;
     Button button1_;
     Button button2_;
+#if CONFIG_STOPWATCH_USB_CONSOLE
+    bool rear_usb_mode_ = true;
+#else
+    bool rear_usb_mode_ = false;
+#endif
+#if CONFIG_STOPWATCH_NAND
+    stopwatch::NandStorage nand_storage_;
+#endif
 #if CONFIG_STOPWATCH_REAR_BUTTONS
     std::unique_ptr<Button> rear_chat_button_;
     std::unique_ptr<Button> rear_volume_up_button_;
@@ -385,10 +414,10 @@ private:
         });
     }
 
-#if CONFIG_STOPWATCH_REAR_BUTTONS
+#if CONFIG_STOPWATCH_REAR_BUTTONS || CONFIG_STOPWATCH_USB_CONSOLE
     void InitializeRearButtons() {
         // Rear pin 3 = G20, pin 5 = G19 only when M5IOE1 G1 is high.
-        // Create the GPIO buttons after switching away from UART0.
+        // Select this route for both USB and the GPIO19/20 button mode.
         m5ioe1_err_t err = M5IOE1_OK;
         ioe_.pinModeWithRes(IOE_PIN_REAR_MUX, OUTPUT, &err);
         if (err == M5IOE1_OK) {
@@ -398,15 +427,40 @@ private:
             ioe_.digitalWriteWithRes(IOE_PIN_REAR_MUX, HIGH, &err);
         }
         if (err != M5IOE1_OK) {
-            ESP_LOGE(TAG, "Failed to route rear pins to GPIO19/20; rear buttons disabled");
+            ESP_LOGE(TAG, "Failed to route rear MUX to GPIO19/20 (USB/button mode)");
             return;
         }
+#if CONFIG_STOPWATCH_AUTO_USB_KEYS
+        rear_usb_mode_ = false;
+        // A power bank supplies no USB host SOF packets. Decide once per boot.
+        for (int attempt = 0; attempt < 20; ++attempt) {
+            if (usb_serial_jtag_is_connected()) {
+                rear_usb_mode_ = true;
+                break;
+            }
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+#endif
+#if CONFIG_STOPWATCH_REAR_BUTTONS
         rear_chat_button_ = std::make_unique<Button>(REAR_CHAT_BUTTON_GPIO, false);
-        rear_volume_up_button_ = std::make_unique<Button>(REAR_VOLUME_UP_BUTTON_GPIO, false);
-        rear_volume_down_button_ = std::make_unique<Button>(REAR_VOLUME_DOWN_BUTTON_GPIO, false);
         rear_chat_button_->OnClick([this]() { HandleChatButton(); });
-        rear_volume_up_button_->OnClick([this]() { ChangeVolume(10); });
-        rear_volume_down_button_->OnClick([this]() { ChangeVolume(-10); });
+#if !CONFIG_STOPWATCH_USB_CONSOLE || CONFIG_STOPWATCH_AUTO_USB_KEYS
+        if (!rear_usb_mode_) {
+            // Button's active-low GPIO backend enables the ESP32-S3 internal pull-up.
+            // Configuring these pads for GPIO also disconnects the USB PHY.
+            rear_volume_up_button_ = std::make_unique<Button>(REAR_VOLUME_UP_BUTTON_GPIO, false);
+            rear_volume_down_button_ =
+                std::make_unique<Button>(REAR_VOLUME_DOWN_BUTTON_GPIO, false);
+            rear_volume_up_button_->OnClick([this]() { ChangeVolume(10); });
+            rear_volume_down_button_->OnClick([this]() { ChangeVolume(-10); });
+            ESP_LOGI(TAG, "Rear volume keys enabled with internal pull-ups; USB mode off");
+        }
+#endif
+#endif
+#if CONFIG_STOPWATCH_USB_CONSOLE
+        if (rear_usb_mode_)
+            ESP_LOGI(TAG, "USB Serial/JTAG enabled; GPIO19/20 volume buttons disabled");
+#endif
     }
 #endif
 
@@ -416,7 +470,7 @@ private:
 
         // Button2: volume 0 -> 10 -> ... -> 100 -> 0
         button2_.OnClick([this]() { ChangeVolume(10, true); });
-#if CONFIG_STOPWATCH_REAR_BUTTONS
+#if CONFIG_STOPWATCH_REAR_BUTTONS || CONFIG_STOPWATCH_USB_CONSOLE
         InitializeRearButtons();
 #endif
     }
@@ -432,6 +486,21 @@ public:
         InitializeSpi();
         InitializeDisplay();
         InitializeButtons();
+#if CONFIG_STOPWATCH_NAND
+#if CONFIG_STOPWATCH_NAND_EMOJIS
+        nand_storage_.SetEmojiCallbacks(
+            [this](std::shared_ptr<stopwatch::NandEmojiCatalog> catalog) {
+                Application::GetInstance().Schedule([this, catalog = std::move(catalog)]() {
+                    display_->InstallNandEmojis(catalog);
+                });
+            },
+            [this](const char* emotion) {
+                Application::GetInstance().Schedule(
+                    [this, name = std::string(emotion)]() { display_->SetEmotion(name.c_str()); });
+            });
+#endif
+        nand_storage_.Start(rear_usb_mode_);
+#endif
     }
 
     AudioCodec* GetAudioCodec() override {

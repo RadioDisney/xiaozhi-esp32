@@ -1,6 +1,10 @@
 #pragma once
 
 #include <lvgl.h>
+#include <functional>
+#include <memory>
+
+class MjpegFrameSource;
 
 // Wrap around lv_img_dsc_t
 class LvglImage {
@@ -12,7 +16,21 @@ public:
     virtual size_t RawSize() const { return 0; }
     virtual const uint8_t* IndexData() const { return nullptr; }
     virtual size_t IndexSize() const { return 0; }
+    virtual std::shared_ptr<MjpegFrameSource> CreateMjpegSource() const { return nullptr; }
     virtual ~LvglImage() = default;
+};
+
+// Factories create one source per selection; inactive emotions hold no open files.
+class LvglMjpegSourceImage : public LvglImage {
+public:
+    explicit LvglMjpegSourceImage(std::function<std::shared_ptr<MjpegFrameSource>()> factory)
+        : factory_(std::move(factory)) {}
+    const lv_img_dsc_t* image_dsc() const override { return nullptr; }
+    bool IsMjpeg() const override { return true; }
+    std::shared_ptr<MjpegFrameSource> CreateMjpegSource() const override { return factory_(); }
+
+private:
+    std::function<std::shared_ptr<MjpegFrameSource>()> factory_;
 };
 
 class LvglRawImage : public LvglImage {

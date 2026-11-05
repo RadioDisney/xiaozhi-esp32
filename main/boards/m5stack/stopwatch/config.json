@@ -29,8 +29,90 @@
                 "CONFIG_ESP_CONSOLE_UART_DEFAULT=y",
                 "CONFIG_ESP_CONSOLE_SECONDARY_NONE=y",
                 "CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=n",
-                "CONFIG_USJ_ENABLE_USB_SERIAL_JTAG=n"
+                "CONFIG_USJ_ENABLE_USB_SERIAL_JTAG=n",
+                "CONFIG_STOPWATCH_USB_CONSOLE=n"
             ]
+        },
+        {
+            "name": "m5stack-stopwatch-rear-buttons-nand",
+            "sdkconfig_append": [
+                "CONFIG_SPIRAM=y",
+                "CONFIG_SPIRAM_MODE_OCT=y",
+                "CONFIG_SPIRAM_SPEED_80M=y",
+                "CONFIG_LV_USE_BUILTIN_MALLOC=n",
+                "CONFIG_LV_USE_CLIB_MALLOC=y",
+                "CONFIG_LV_USE_LODEPNG=n",
+                "CONFIG_LV_USE_LIBPNG=n",
+                "CONFIG_STOPWATCH_REAR_BUTTONS=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_NONE=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=n",
+                "CONFIG_STOPWATCH_NAND=y",
+                "CONFIG_STOPWATCH_NAND_CLOCK_MHZ=5",
+                "CONFIG_STOPWATCH_NAND_QUAD=n",
+                "CONFIG_STOPWATCH_NAND_SELF_TEST_ON_BOOT=y",
+                "CONFIG_NAND_FLASH_VERIFY_WRITE=y",
+                "CONFIG_STOPWATCH_USB_CONSOLE=y",
+                "CONFIG_ESP_CONSOLE_UART_DEFAULT=n",
+                "CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y",
+                "CONFIG_USJ_ENABLE_USB_SERIAL_JTAG=y",
+                "CONFIG_LITTLEFS_CACHE_SIZE=2048"
+            ],
+            "idf_version": ">=6.1"
+        },
+        {
+            "name": "m5stack-stopwatch-rear-buttons-nand-qio",
+            "sdkconfig_append": [
+                "CONFIG_SPIRAM=y",
+                "CONFIG_SPIRAM_MODE_OCT=y",
+                "CONFIG_SPIRAM_SPEED_80M=y",
+                "CONFIG_LV_USE_BUILTIN_MALLOC=n",
+                "CONFIG_LV_USE_CLIB_MALLOC=y",
+                "CONFIG_LV_USE_LODEPNG=n",
+                "CONFIG_LV_USE_LIBPNG=n",
+                "CONFIG_STOPWATCH_REAR_BUTTONS=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_NONE=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=n",
+                "CONFIG_STOPWATCH_NAND=y",
+                "CONFIG_STOPWATCH_NAND_CLOCK_MHZ=40",
+                "CONFIG_STOPWATCH_NAND_QUAD=y",
+                "CONFIG_STOPWATCH_NAND_SELF_TEST_ON_BOOT=y",
+                "CONFIG_NAND_FLASH_VERIFY_WRITE=y",
+                "CONFIG_STOPWATCH_USB_CONSOLE=y",
+                "CONFIG_ESP_CONSOLE_UART_DEFAULT=n",
+                "CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y",
+                "CONFIG_USJ_ENABLE_USB_SERIAL_JTAG=y",
+                "CONFIG_LITTLEFS_CACHE_SIZE=2048"
+            ],
+            "idf_version": ">=6.1"
+        },
+        {
+            "name": "m5stack-stopwatch-nand-mjpeg-auto",
+            "sdkconfig_append": [
+                "CONFIG_SPIRAM=y",
+                "CONFIG_SPIRAM_MODE_OCT=y",
+                "CONFIG_SPIRAM_SPEED_80M=y",
+                "CONFIG_LV_USE_BUILTIN_MALLOC=n",
+                "CONFIG_LV_USE_CLIB_MALLOC=y",
+                "CONFIG_LV_USE_LODEPNG=n",
+                "CONFIG_LV_USE_LIBPNG=n",
+                "CONFIG_STOPWATCH_REAR_BUTTONS=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_NONE=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=n",
+                "CONFIG_STOPWATCH_NAND=y",
+                "CONFIG_STOPWATCH_NAND_CLOCK_MHZ=40",
+                "CONFIG_STOPWATCH_NAND_QUAD=y",
+                "CONFIG_STOPWATCH_NAND_SELF_TEST_ON_BOOT=n",
+                "CONFIG_NAND_FLASH_VERIFY_WRITE=y",
+                "CONFIG_STOPWATCH_USB_CONSOLE=y",
+                "CONFIG_ESP_CONSOLE_UART_DEFAULT=n",
+                "CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y",
+                "CONFIG_USJ_ENABLE_USB_SERIAL_JTAG=y",
+                "CONFIG_LITTLEFS_CACHE_SIZE=2048",
+                "CONFIG_STOPWATCH_NAND_EMOJIS=y",
+                "CONFIG_STOPWATCH_AUTO_USB_KEYS=y",
+                "CONFIG_LITTLEFS_LOOKAHEAD_SIZE=8192"
+            ],
+            "idf_version": ">=6.1"
         }
     ]
 }

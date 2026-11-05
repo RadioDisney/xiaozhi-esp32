@@ -671,12 +671,82 @@ config STOPWATCH_REAR_BUTTONS
     depends on BOARD_TYPE_M5STACK_STOPWATCH
     default n
     help
-        Use active-low buttons with 10 kOhm pull-ups to 3.3 V: GPIO3 toggles
+        Use active-low buttons with internal pull-ups: GPIO3 toggles
         conversation, GPIO19 increases volume, GPIO20 decreases volume.
-        Routes the rear MUX pins to GPIO19/20 via M5IOE1 G1. USB data cannot
-        be used at the same time. Disable USB primary and secondary consoles
-        and the USB Serial/JTAG driver.
+        With STOPWATCH_USB_CONSOLE enabled only GPIO3 is used; GPIO19/20
+        remain assigned to USB. For all three buttons, disable USB consoles
+        and the USB Serial/JTAG driver and turn STOPWATCH_USB_CONSOLE off.
         Build the m5stack-stopwatch-rear-buttons release variant for this wiring.
+
+config STOPWATCH_USB_CONSOLE
+    bool "StopWatch: reserve GPIO19/20 for USB logging"
+    depends on BOARD_TYPE_M5STACK_STOPWATCH
+    default y if STOPWATCH_NAND
+    default n
+    help
+        Route the rear MUX to USB and leave GPIO19/20 under USB Serial/JTAG
+        control. GPIO3 and the top buttons still work. Select USB Serial/JTAG
+        Controller as the primary console and enable its module. The NAND
+        release variants use this mode by default for hardware testing.
+
+config STOPWATCH_AUTO_USB_KEYS
+    bool "StopWatch: choose USB or rear volume keys at boot"
+    depends on STOPWATCH_REAR_BUTTONS && STOPWATCH_USB_CONSOLE && STOPWATCH_NAND
+    default n
+    help
+        Wait briefly for USB host SOF packets after routing the rear MUX.
+        With a computer connected, reserve GPIO19/20 for USB. Otherwise use
+        the pins as active-low volume keys with internal pull-ups. The mode
+        stays fixed until the next restart; USB power alone is not a host.
+
+config STOPWATCH_NAND
+    bool "StopWatch: GD5F1GM7 rear SPI NAND + LittleFS"
+    depends on BOARD_TYPE_M5STACK_STOPWATCH
+    depends on IDF_INIT_VERSION >= "6.1"
+    select NAND_FLASH_ENABLE_BDL
+    default n
+    help
+        Dedicated SPI3 bus: CS=4 CLK=8 D0=7 D1=5 D2=6 D3=9.
+        Uses the ESP-MOSAICO storage stack: SPI NAND, Dhara FTL, LittleFS.
+        Mounts /nand in a background task. Never formats automatically.
+
+config STOPWATCH_NAND_CLOCK_MHZ
+    int "StopWatch NAND SPI clock (MHz)"
+    depends on STOPWATCH_NAND
+    range 1 80
+    default 5
+    help
+        Start at 5 MHz for a pin-header expansion board. Validate wiring and
+        data integrity before raising the clock to 10, 20, 40 or 80 MHz.
+
+config STOPWATCH_NAND_QUAD
+    bool "StopWatch NAND: use four data lines (Quad Output)"
+    depends on STOPWATCH_NAND
+    default n
+    help
+        Default SIO tests D0/D1 with D2/WP and D3/HOLD held high. Quad mode
+        enables QE over SIO, then uses QOUT (6Bh single-line address and
+        four-line data) and four-line program load on SPI3. The EBh QIO read
+        transaction is not used for this GD5F1GM7 board.
+
+config STOPWATCH_NAND_SELF_TEST_ON_BOOT
+    bool "StopWatch NAND: file integrity test after mounting"
+    depends on STOPWATCH_NAND
+    default y
+    help
+        Checks a persistent test file from the previous boot, then writes,
+        syncs, renames, reopens and verifies a new 256 KiB test file.
+        A blank or damaged volume is left unformatted for explicit recovery.
+
+config STOPWATCH_NAND_EMOJIS
+    bool "StopWatch: stream MJPEG emotions from external NAND"
+    depends on STOPWATCH_NAND && SPIRAM
+    default n
+    help
+        Keep artist MJPEG streams in a verified external NAND pack. Only
+        frame metadata and the current JPEG are read into RAM. This mode
+        rejects destructive/remount maintenance while assets are in use.
+        Disable STOPWATCH_NAND_SELF_TEST_ON_BOOT for normal playback.
 
 config RESPEAKER_I2S_EXTERNAL_CLOCK_48K
     bool "ReSpeaker: XMOS supplies 48 kHz I2S clocks"

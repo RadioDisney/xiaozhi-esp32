@@ -101,6 +101,9 @@ esp_err_t SystemInfo::PrintTaskCpuUsage(TickType_t xTicksToWait) {
         goto exit;
     }
 
+    printf("CPU_WINDOW runtime_delta=%lu cores=%u\n",
+           static_cast<unsigned long>(total_elapsed_time),
+           static_cast<unsigned>(CONFIG_FREERTOS_NUMBER_OF_CORES));
     printf("| Task | Run Time | Percentage\n");
     //Match each task in start_array to those in the end_array
     for (int i = 0; i < start_array_size; i++) {
