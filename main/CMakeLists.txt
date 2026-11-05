@@ -1155,6 +1155,9 @@ if(CONFIG_BOARD_TYPE_ESP_VOCAT AND IDF_VERSION_MAJOR LESS 6)
         espressif__touch_button_sensor
     )
 endif()
+if(CONFIG_STOPWATCH_AUTO_USB_KEYS)
+    list(APPEND MAIN_PRIV_REQUIRES_EXTRA esp_driver_usb_serial_jtag)
+endif()
 if(CONFIG_BOARD_TYPE_ESP32_P4_FUNCTION_EV_BOARD)
     list(APPEND MAIN_PRIV_REQUIRES_EXTRA
         esp_driver_sdmmc

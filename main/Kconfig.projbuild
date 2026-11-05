@@ -671,12 +671,26 @@ config STOPWATCH_REAR_BUTTONS
     depends on BOARD_TYPE_M5STACK_STOPWATCH
     default n
     help
-        Use active-low buttons with 10 kOhm pull-ups to 3.3 V: GPIO3 toggles
+        Use active-low buttons with internal pull-ups: GPIO3 toggles
         conversation, GPIO19 increases volume, GPIO20 decreases volume.
         Routes the rear MUX pins to GPIO19/20 via M5IOE1 G1. USB data cannot
-        be used at the same time. Disable USB primary and secondary consoles
-        and the USB Serial/JTAG driver.
+        be used at the same time. In fixed button mode, disable USB primary
+        and secondary consoles and the USB Serial/JTAG driver. Enable
+        STOPWATCH_AUTO_USB_KEYS to choose between USB and volume keys at boot.
         Build the m5stack-stopwatch-rear-buttons release variant for this wiring.
+
+config STOPWATCH_AUTO_USB_KEYS
+    bool "StopWatch: choose USB or rear volume keys at boot"
+    depends on STOPWATCH_REAR_BUTTONS
+    default n
+    help
+        Route the rear MUX to GPIO19/20 and wait up to two seconds for USB
+        host SOF traffic, requiring three consecutive connected checks.
+        Keep USB Serial/JTAG when a host is connected. Otherwise configure
+        GPIO19/20 as internally pulled-up volume keys. Power-only charging
+        does not count as a USB data connection. The mode stays fixed until
+        the next restart. Requires the USB Serial/JTAG primary console and
+        its module; use the rear-buttons-auto-usb release variant.
 
 config RESPEAKER_I2S_EXTERNAL_CLOCK_48K
     bool "ReSpeaker: XMOS supplies 48 kHz I2S clocks"

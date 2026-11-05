@@ -16,6 +16,9 @@
 #include "charging_icon.h"
 #include "codecs/es8311_audio_codec.h"
 #include "config.h"
+#if CONFIG_STOPWATCH_AUTO_USB_KEYS
+#include <driver/usb_serial_jtag.h>
+#endif
 #include "display/lcd_display.h"
 #include "esp_lcd_co5300.h"
 #include "jpg/jpeg_to_image.h"
@@ -402,12 +405,26 @@ private:
             return;
         }
         rear_chat_button_ = std::make_unique<Button>(REAR_CHAT_BUTTON_GPIO, false);
+        rear_chat_button_->OnClick([this]() { HandleChatButton(); });
+#if CONFIG_STOPWATCH_AUTO_USB_KEYS
+        // A real host emits USB SOF packets even without a serial terminal open.
+        // Never touch the USB pads or their GPIO pulls until the probe expires.
+        unsigned connected_checks = 0;
+        for (unsigned attempt = 0; attempt < 40; ++attempt) {
+            vTaskDelay(pdMS_TO_TICKS(50));
+            connected_checks = usb_serial_jtag_is_connected() ? connected_checks + 1 : 0;
+            if (connected_checks >= 3) {
+                ESP_LOGI(TAG, "Rear port: USB host detected; GPIO19/20 kept for USB Serial/JTAG");
+                return;
+            }
+        }
+        ESP_LOGI(TAG, "Rear port: no USB host within 2 s; enabling internal-pullup volume keys");
+#endif
         rear_volume_up_button_ = std::make_unique<Button>(REAR_VOLUME_UP_BUTTON_GPIO, false);
         rear_volume_down_button_ = std::make_unique<Button>(REAR_VOLUME_DOWN_BUTTON_GPIO, false);
         // The rear volume keys connect directly to GND, without external pull-ups.
         ESP_ERROR_CHECK(gpio_set_pull_mode(REAR_VOLUME_UP_BUTTON_GPIO, GPIO_PULLUP_ONLY));
         ESP_ERROR_CHECK(gpio_set_pull_mode(REAR_VOLUME_DOWN_BUTTON_GPIO, GPIO_PULLUP_ONLY));
-        rear_chat_button_->OnClick([this]() { HandleChatButton(); });
         rear_volume_up_button_->OnClick([this]() { ChangeVolume(10); });
         rear_volume_down_button_->OnClick([this]() { ChangeVolume(-10); });
     }

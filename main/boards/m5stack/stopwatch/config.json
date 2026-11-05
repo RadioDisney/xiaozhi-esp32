@@ -31,6 +31,25 @@
                 "CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=n",
                 "CONFIG_USJ_ENABLE_USB_SERIAL_JTAG=n"
             ]
+        },
+        {
+            "name": "m5stack-stopwatch-rear-buttons-auto-usb",
+            "sdkconfig_append": [
+                "CONFIG_SPIRAM=y",
+                "CONFIG_SPIRAM_MODE_OCT=y",
+                "CONFIG_SPIRAM_SPEED_80M=y",
+                "CONFIG_LV_USE_BUILTIN_MALLOC=n",
+                "CONFIG_LV_USE_CLIB_MALLOC=y",
+                "CONFIG_LV_USE_LODEPNG=n",
+                "CONFIG_LV_USE_LIBPNG=n",
+                "CONFIG_STOPWATCH_REAR_BUTTONS=y",
+                "CONFIG_STOPWATCH_AUTO_USB_KEYS=y",
+                "CONFIG_ESP_CONSOLE_UART_DEFAULT=n",
+                "CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_NONE=y",
+                "CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=n",
+                "CONFIG_USJ_ENABLE_USB_SERIAL_JTAG=y"
+            ]
         }
     ]
 }

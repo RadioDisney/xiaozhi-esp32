@@ -33,6 +33,24 @@ class StopwatchButtonsTest(unittest.TestCase):
             #include <vector>
             #include "config.h"
             #define ESP_LOGE(...) ((void)0)
+            #define ESP_LOGI(...) ((void)0)
+            #ifndef CONFIG_STOPWATCH_AUTO_USB_KEYS
+            #define CONFIG_STOPWATCH_AUTO_USB_KEYS 0
+            #endif
+            #ifndef TEST_HOST_PATTERN
+            #define TEST_HOST_PATTERN 0
+            #endif
+            #define EXPECT_USB (CONFIG_STOPWATCH_AUTO_USB_KEYS && (TEST_HOST_PATTERN==1||TEST_HOST_PATTERN==2))
+            int usb_checks=0,boot_waits=0;
+            bool usb_serial_jtag_is_connected(){
+                ++usb_checks;
+                if(TEST_HOST_PATTERN==1)return true;
+                if(TEST_HOST_PATTERN==2)return usb_checks>=10;
+                if(TEST_HOST_PATTERN==3)return usb_checks%2;
+                return false;
+            }
+            #define pdMS_TO_TICKS(n) (n)
+            void vTaskDelay(int ms){assert(ms==50);++boot_waits;}
             #define ESP_ERROR_CHECK(expr) assert((expr)==0)
             constexpr int GPIO_PULLUP_ONLY=1;
             std::vector<int> volume_pullups;
@@ -100,12 +118,22 @@ class StopwatchButtonsTest(unittest.TestCase):
                 assert(board.codec.volume==100);app.Drain();assert(board.codec.volume==0);
             #if CONFIG_STOPWATCH_REAR_BUTTONS
                 assert(board.ioe_.calls==3 && board.ioe_.level==HIGH);
+            #if EXPECT_USB
+                assert((Button::rear_pins==std::vector<int>{3}));
+                assert(volume_pullups.empty());
+                assert(!board.rear_volume_up_button_&&!board.rear_volume_down_button_);
+                assert(usb_checks==(TEST_HOST_PATTERN==1?3:12));
+            #else
                 assert((Button::rear_pins==std::vector<int>{3,19,20}));
                 assert((volume_pullups==std::vector<int>{19,20}));
+                assert(usb_checks==(CONFIG_STOPWATCH_AUTO_USB_KEYS?40:0));
+            #endif
+                assert(boot_waits==usb_checks);
                 board.rear_chat_button_->click();app.Drain();assert(app.toggles==2);
                 app.state=kDeviceStateStarting;
                 board.rear_chat_button_->click();app.Drain();assert(board.wifi_config==2);
                 app.state=kDeviceStateIdle;
+            #if !EXPECT_USB
                 board.codec.volume=95;board.rear_volume_up_button_->click();
                 app.Drain();assert(board.codec.volume==100);
                 board.rear_volume_up_button_->click();app.Drain();assert(board.codec.volume==100);
@@ -117,6 +145,7 @@ class StopwatchButtonsTest(unittest.TestCase):
                 board.rear_volume_down_button_->click();board.button2_.click();
                 assert(board.codec.volume==50);app.Drain();assert(board.codec.volume==70);
                 assert(board.display.notification=="volume:70%");
+            #endif
                 for(int fail_at:{1,2,3}){
                     Board failed;failed.ioe_.fail_at=fail_at;failed.InitializeButtons();
                     assert(failed.ioe_.calls==fail_at);
@@ -124,10 +153,11 @@ class StopwatchButtonsTest(unittest.TestCase):
                            !failed.rear_volume_down_button_);
                     failed.button1_.click();app.Drain();
                 }
-                assert(Button::rear_pins.size()==3);
+                assert(Button::rear_pins.size()==(EXPECT_USB?1:3));
             #else
                 assert(Button::rear_pins.empty() && board.ioe_.calls==0);
                 assert(volume_pullups.empty());
+                assert(usb_checks==0);
             #endif
             }
         '''
@@ -151,10 +181,14 @@ class StopwatchButtonsTest(unittest.TestCase):
                 ''' + methods + "\n#if CONFIG_STOPWATCH_REAR_BUTTONS\n" + rear_method +
                 "\n#endif\n};\n" + driver)
             compiler = shlex.split(os.environ.get("CXX", "c++"))
-            for rear in (0, 1):
-                with self.subTest(rear=rear):
-                    executable = work / f"buttons-{rear}"
+            for rear, auto, host in ((0,0,0),(1,0,0),(1,1,0),(1,1,1),(1,1,2),(1,1,3)):
+                with self.subTest(rear=rear, auto=auto, host=host):
+                    executable = work / f"buttons-{rear}-{auto}-{host}"
                     command = compiler + ["-std=c++23", f"-DCONFIG_STOPWATCH_REAR_BUTTONS={rear}",
+                                          f"-DCONFIG_STOPWATCH_AUTO_USB_KEYS={auto}",
+                                          f"-DCONFIG_ESP_CONSOLE_USB_SERIAL_JTAG={auto}",
+                                          f"-DCONFIG_USJ_ENABLE_USB_SERIAL_JTAG={auto}",
+                                          f"-DTEST_HOST_PATTERN={host}",
                                           "-I" + str(work), "-I" + str(BOARD), str(program),
                                           "-o", str(executable)]
                     subprocess.run(command, check=True)
@@ -164,6 +198,11 @@ class StopwatchButtonsTest(unittest.TestCase):
                 "-I" + str(work), "-I" + str(BOARD), str(program)], capture_output=True, text=True)
             self.assertNotEqual(conflict.returncode, 0)
             self.assertIn("disable USB consoles", conflict.stderr)
+            missing_usb = subprocess.run(compiler + ["-std=c++23", "-fsyntax-only",
+                "-DCONFIG_STOPWATCH_REAR_BUTTONS=1", "-DCONFIG_STOPWATCH_AUTO_USB_KEYS=1",
+                "-I" + str(work), "-I" + str(BOARD), str(program)], capture_output=True, text=True)
+            self.assertNotEqual(missing_usb.returncode, 0)
+            self.assertIn("requires the USB Serial/JTAG primary console and module", missing_usb.stderr)
 
 
 if __name__ == "__main__":

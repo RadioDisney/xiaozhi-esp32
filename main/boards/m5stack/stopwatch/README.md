@@ -38,6 +38,31 @@ python3 scripts/build.py m5stack/stopwatch --name m5stack-stopwatch-rear-buttons
 USB 主/副控制台和 USB Serial/JTAG 驱动，再启用 `StopWatch: three rear expansion buttons` 选项；发布
 构建应使用上述命令，以保留正确的扩展版身份。
 
+### 开机自动选择 USB 或音量键
+
+不使用外部 NAND 的自动版为 `m5stack-stopwatch-rear-buttons-auto-usb`：
+
+```bash
+python3 scripts/build.py m5stack/stopwatch \
+  --name m5stack-stopwatch-rear-buttons-auto-usb --language zh-CN --zip
+```
+
+每次开机先将背部 MUX 接到 GPIO19/20，保留 USB PHY，最多等待 2 秒检测 USB 主机
+SOF 数据包，连续三个 50 ms 检测为已连接才确定 USB 模式。
+这表示检测到真实 USB 主机总线通信，不要求打开串口软件或发送应用层命令。
+
+- 电脑数据连接成功：GPIO19/20 继续用于 USB Serial/JTAG 日志，背部音量键停用，
+  不为这两根引脚配置 GPIO 模式或上拉。
+- 超时无 USB 主机：GPIO19/20 改为音量加/减，使用片内上拉，按键接 GND。
+  GPIO 初始化会将这两根引脚从 USB PHY 切到 GPIO。
+- GPIO3 语音键和顶部按键在两种模式下均保留。
+
+电池、充电器或纯供电线没有主机数据包，因此会进入按键模式；运行中插拔 USB
+不再切换，重新启动才重新检测。移除 GPIO19/20 外部上拉后，松开的按键可保持连接，
+USB 通信期间不要操作这两颗背部按键。
+自动版使用相同的内置表情、分区和硬件引脚，不启用 NAND。
+原 `m5stack-stopwatch-rear-buttons` 继续提供固定按键模式。
+
 触摸控制器的复位线在初始化时释放，但尚未接入触摸事件；IMU、RTC、振动反馈和
 专门的低功耗策略也尚未接入本板卡的应用流程。
 
