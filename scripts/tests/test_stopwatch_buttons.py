@@ -33,6 +33,13 @@ class StopwatchButtonsTest(unittest.TestCase):
             #include <vector>
             #include "config.h"
             #define ESP_LOGE(...) ((void)0)
+            #define ESP_ERROR_CHECK(expr) assert((expr)==0)
+            constexpr int GPIO_PULLUP_ONLY=1;
+            std::vector<int> volume_pullups;
+            int gpio_set_pull_mode(int pin,int mode){
+                assert((pin==19||pin==20)&&mode==GPIO_PULLUP_ONLY);
+                volume_pullups.push_back(pin);return 0;
+            }
             constexpr int M5IOE1_PIN_1=1, OUTPUT=1, HIGH=1;
             constexpr int M5IOE1_OK=0, M5IOE1_DRIVE_PUSHPULL=0;
             constexpr int kDeviceStateStarting=0, kDeviceStateIdle=1;
@@ -94,6 +101,7 @@ class StopwatchButtonsTest(unittest.TestCase):
             #if CONFIG_STOPWATCH_REAR_BUTTONS
                 assert(board.ioe_.calls==3 && board.ioe_.level==HIGH);
                 assert((Button::rear_pins==std::vector<int>{3,19,20}));
+                assert((volume_pullups==std::vector<int>{19,20}));
                 board.rear_chat_button_->click();app.Drain();assert(app.toggles==2);
                 app.state=kDeviceStateStarting;
                 board.rear_chat_button_->click();app.Drain();assert(board.wifi_config==2);
@@ -119,6 +127,7 @@ class StopwatchButtonsTest(unittest.TestCase):
                 assert(Button::rear_pins.size()==3);
             #else
                 assert(Button::rear_pins.empty() && board.ioe_.calls==0);
+                assert(volume_pullups.empty());
             #endif
             }
         '''

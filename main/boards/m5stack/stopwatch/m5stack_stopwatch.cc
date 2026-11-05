@@ -404,6 +404,9 @@ private:
         rear_chat_button_ = std::make_unique<Button>(REAR_CHAT_BUTTON_GPIO, false);
         rear_volume_up_button_ = std::make_unique<Button>(REAR_VOLUME_UP_BUTTON_GPIO, false);
         rear_volume_down_button_ = std::make_unique<Button>(REAR_VOLUME_DOWN_BUTTON_GPIO, false);
+        // The rear volume keys connect directly to GND, without external pull-ups.
+        ESP_ERROR_CHECK(gpio_set_pull_mode(REAR_VOLUME_UP_BUTTON_GPIO, GPIO_PULLUP_ONLY));
+        ESP_ERROR_CHECK(gpio_set_pull_mode(REAR_VOLUME_DOWN_BUTTON_GPIO, GPIO_PULLUP_ONLY));
         rear_chat_button_->OnClick([this]() { HandleChatButton(); });
         rear_volume_up_button_->OnClick([this]() { ChangeVolume(10); });
         rear_volume_down_button_->OnClick([this]() { ChangeVolume(-10); });
